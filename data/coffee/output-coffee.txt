@@ -1,0 +1,62 @@
+<!-- Dataset Variables Explanation:
+
+	-> height: Maximum height of the coffee beans in the tray.
+			- Number value rounded to 2 decimals.
+	
+	-> moisture: The measured moisture of the coffee beans.
+			- Number value rounded to 2 decimals.
+	
+	-> roasting degree: Roasting Degree of the coffee beans.
+			- 1: light roast.
+			- 2: medium roast.
+			- 2: dark roast.
+			
+	-> Roasting chamber {x}: Seperate chambers used to roast the coffee beans.
+			- 1,2,3: Used for all roasts.
+			- 4: 	 Used for medium roasts.
+			- 5: 	 Used for dark roasts.
+			
+	-> Temperature sensor t{y}: Group of sensors that record the highest temperature within a specific roasting chamber.
+			- t1,t2,t3,t4,t5: Group of sensor for each.
+				
+-->
+
+<!-- Topology Order -->
+c1 = ({Roasting Chamber 3}, {Roasting Chamber 4}, {directly follows}, {roasting degree = medium OR roasting degree == dark})
+c2 = ({Roasting Chamber 4}, {Roasting Chamber 5}, {directly follows}, {roasting degree == dark})
+
+
+<!-- Golden Standard: light roast -->
+c3 = ({Roasting Chamber 1}, {Roasting Chamber 2}, {directly follows}, {roasting degree == light AND height < 180 AND 120 <= t1 <= 400})
+c4 = ({Roasting Chamber 2}, {Roasting Chamber 3}, {directly follows}, {roasting degree == light AND height < 180 AND 220 <= t2 <= 500})
+c5 = ({Roasting Chamber 3}, {Final Measure}, {directly follows}, {roasting degree == light AND height < 180 AND t3 <= 550})
+
+c6 = ({Roasting Chamber 1}, {Roasting Chamber 2}, {directly follows}, {roasting degree == light AND height >= 180 AND 140 <= t1 <= 420})
+c7 = ({Roasting Chamber 2}, {Roasting Chamber 3}, {directly follows}, {roasting degree == light AND height >= 180 AND 240 <= t2 <= 520})
+c8 = ({Roasting Chamber 3}, {Final Measure}, {directly follows}, {roasting degree == light AND height >= 180 AND t3 <= 570})
+
+
+<!-- Golden Standard: medium roast -->
+c9 = ({Roasting Chamber 1}, {Roasting Chamber 2}, {directly follows}, {roasting degree == medium AND height < 170 AND 170 <= t1 <= 450})
+c10 = ({Roasting Chamber 2}, {Roasting Chamber 3}, {directly follows}, {roasting degree == medium AND height < 170 AND 270 <= t2 <= 550})
+c11 = ({Roasting Chamber 3}, {Roasting Chamber 4}, {directly follows}, {roasting degree == medium AND height < 170 AND 370 <= t3 <= 650})
+c12 = ({Roasting Chamber 4}, {Final Measure}, {directly follows}, {roasting degree == medium AND height < 170 AND t4 <= 550})
+
+c13 = ({Roasting Chamber 1}, {Roasting Chamber 2}, {directly follows}, {roasting degree == medium AND height >= 170 AND 450 < t1 < 170})
+c14 = ({Roasting Chamber 2}, {Roasting Chamber 3}, {directly follows}, {roasting degree == medium AND height >= 170 AND 550 < t2 < 270})
+c15 = ({Roasting Chamber 3}, {Roasting Chamber 4}, {directly follows}, {roasting degree == medium AND height >= 170 AND 650 < t3 < 370})
+c16 = ({Roasting Chamber 4}, {Final Measure}, {directly follows}, {roasting degree == medium AND height >= 170 AND t4 <= 550})
+
+
+<!-- Golden Standard: dark roast -->
+c17 = ({Roasting Chamber 1}, {Roasting Chamber 2}, {directly follows}, {roasting degree == dark AND height < 175 AND 200 <= t1 <= 560})
+c18 = ({Roasting Chamber 2}, {Roasting Chamber 3}, {directly follows}, {roasting degree == dark AND height < 175 AND 300 <= t2 <= 660})
+c19 = ({Roasting Chamber 3}, {Roasting Chamber 4}, {directly follows}, {roasting degree == dark AND height < 175 AND 400 <= t3 <= 760})
+c20 = ({Roasting Chamber 4}, {Roasting Chamber 5}, {directly follows}, {roasting degree == dark AND height < 175 AND 300 <= t4 <= 660})
+c21 = ({Roasting Chamber 5}, {Final Measure}, {directly follows}, {roasting degree == dark AND height < 175 AND t4 <= 560})
+
+c22 = ({Roasting Chamber 1}, {Roasting Chamber 2}, {directly follows}, {roasting degree == dark AND height >= 175 AND 220 <= t1 <= 580})
+c23 = ({Roasting Chamber 2}, {Roasting Chamber 3}, {directly follows}, {roasting degree == dark AND height >= 170 AND 320 <= t2 <= 680})
+c24 = ({Roasting Chamber 3}, {Roasting Chamber 4}, {directly follows}, {roasting degree == dark AND height >= 170 AND 420 <= t3 <= 780})
+c25 = ({Roasting Chamber 4}, {Roasting Chamber 5}, {directly follows}, {roasting degree == dark AND height >= 170 AND 320 <= t4 <= 680})
+c26 = ({Roasting Chamber 5}, {Final Measure}, {directly follows}, {roasting degree == dark AND height >= 170 AND t4 <= 580})
