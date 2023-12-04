@@ -1,6 +1,7 @@
 import os
 import sys
 import pickle
+from termcolor import colored
 import pandas as pd
 import spacy
 from spacy.lang.en.stop_words import STOP_WORDS
@@ -119,17 +120,39 @@ def chng_stpwrds(add=[],remove=[],remove_numbers=False,restore_default=False, de
     return stpwrds
 
 # Function to lemmatize and remove stop words
-def lmtz_and_rmv_stpwrds(text, model='en_core_web_lg'):
+def lmtz_and_rmv_stpwrds(text, model='en_core_web_lg', verbose=False):
     """
     Remove stop words and lemmatize text. 
     :param text: Text input from which stop words are removed and which is lemmatized.
     :param model: Pretrained spacy pipeline to use.
+    :param verbose: If True, removed stop words are printed.
     :return: Processed text.
     """
-
     nlp = spacy.load(model)
     doc = nlp(text)
     stpwrds = set(nlp.Defaults.stop_words)
+    
     lemmatized_tokens = [token.lemma_ for token in doc if token.lemma_ not in stpwrds]
+    
+    if verbose:
+        sentences = [sent.text for sent in doc.sents]
+        lemmatized_sentences = [' '.join([token.lemma_ for token in nlp(sentence) if token.lemma_ not in stpwrds]) for sentence in sentences]
+        
+        for sentence, lemma_sentence in zip(sentences, lemmatized_sentences):
+            highlighted_text = ''
+            
+            for token in nlp(sentence):
+                if token.text.isalpha():  # Exclude non-alphabetic tokens
+                    if token.lemma_ not in lemmatized_tokens:
+                        highlighted_text += colored(token.text, 'red') + ' '
+                    else:
+                        highlighted_text += token.text + ' '
+                else:
+                    highlighted_text += token.text + ' '
+            
+            print(highlighted_text.strip())
+            print(lemma_sentence)
+            print('')
+    
     return ' '.join(lemmatized_tokens)
 
