@@ -12,7 +12,7 @@ def txt_to_df(file_path, section_start="# ", subsection_start="## "):
     :param file_path: Relative path to the .txt input file.
     :param section_start: String indicating the start of a section title.
     :param subsection_start: String indicating the start of a subsection title.
-    :return: Dataframe with two columns "Section" and "Content" and {current_section}/{current_subsection} as a syntax for concatinating sections and sub-sections. 
+    :return: Dataframe with the columns "Section", "Raw" and "Processed" as well as {current_section}/{current_subsection} as a syntax for concatinating sections and sub-sections. 
     """
     raw = open(file_path).read()
 
@@ -39,10 +39,11 @@ def txt_to_df(file_path, section_start="# ", subsection_start="## "):
 
             columns[-1][1].append(line)
     
-    data = {"Section": [], "Content": []}
+    data = {"Section": [], "Raw": [], "Processed": []}
     for column_name, column_content in columns:
         data["Section"].append(column_name)
-        data["Content"].append('\n'.join(column_content))
+        data["Raw"].append('\n'.join(column_content))
+        data["Processed"].append('')
 
     return pd.DataFrame(data)
 
@@ -69,7 +70,7 @@ def rmv_and_rplc(text, remove=["\n", "\t"], replace={"->": "leads to", "-->": "l
 
     return text
 
-def chng_stpwrds(add=[],remove=[],remove_numbers=False,restore_default=False, default_filename = 'stopwords_en.pickle',verbose=False):
+def chng_stpwrds(add=[],remove=[],remove_numbers=False,restore_default=False, default_filename = 'stopwords_en.pickle',verbose=False, model='en_core_web_lg'):
     """
     Adds and removes stop words to the default of spacy. 
     :param add: Stop words to add, e.g. ["by", "the"].
@@ -78,6 +79,7 @@ def chng_stpwrds(add=[],remove=[],remove_numbers=False,restore_default=False, de
     :param restore_default: Flag to restore the default stop word selection provided by spacy. 
     :param default_filename: Name of the file with the default stop words. Only relevant if restore_default == True.
     :param verbose: If True, stop words are printed.
+    :param model: Pretrained spacy pipeline to use.
     :return: Stop words.
     """
 
@@ -88,7 +90,7 @@ def chng_stpwrds(add=[],remove=[],remove_numbers=False,restore_default=False, de
     else:
         if remove_numbers:
             stpwrds = sorted(STOP_WORDS)
-            nlp = spacy.load('en_core_web_lg')
+            nlp = spacy.load(model)
 
             for item in stpwrds:
                 doc = nlp(item)
@@ -115,4 +117,19 @@ def chng_stpwrds(add=[],remove=[],remove_numbers=False,restore_default=False, de
         for word in stpwrds:
             print(word)
     return stpwrds
+
+# Function to lemmatize and remove stop words
+def lmtz_and_rmv_stpwrds(text, model='en_core_web_lg'):
+    """
+    Remove stop words and lemmatize text. 
+    :param text: Text input from which stop words are removed and which is lemmatized.
+    :param model: Pretrained spacy pipeline to use.
+    :return: Processed text.
+    """
+
+    nlp = spacy.load(model)
+    doc = nlp(text)
+    stpwrds = set(nlp.Defaults.stop_words)
+    lemmatized_tokens = [token.lemma_ for token in doc if token.lemma_ not in stpwrds]
+    return ' '.join(lemmatized_tokens)
 
