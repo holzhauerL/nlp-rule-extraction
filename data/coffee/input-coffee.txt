@@ -5,7 +5,7 @@
 		-> Copper Moon Coffee, https://www.coppermooncoffee.com/blogs/newsroom/what-is-the-difference-between-light-medium-and-dark-roast-coffee
 ->>
 
-# Coffee Roasting Handbook 1st Edition Exclusive!
+# Coffee Roasting Handbook 1st Edition Exclusive:
 
 # About our Coffee:
 
@@ -22,6 +22,7 @@ We provide brief descriptions of each bean and blend on the bags. Our goal is to
 # Controls and Basic Settings:
 
 ## Power Switch: 
+
 The power switch is the upper-left knob on the main power system visible in the control panel. It turns stiffly, as it is a mechanical timer. The on position is fully clockwise, and the off position is fully anticlockwise. Its primary function is a safety switch; it will automatically switch off the roaster if not manually reset periodically. The switch can also function as a timer, in which case it operates as follows:
 -> 9 o'clock: 10 minutes
 -> 12 o'clock: 20-minutes
@@ -29,18 +30,27 @@ The power switch is the upper-left knob on the main power system visible in the 
 Before charging the roaster with green beans, turn the switch fully on. Alternatively, set it to run for a little longer than the predicted time for the roast. If the roaster stops during the process, immediately turn the switch back on.
 
 ## Heater Control: 
+
 The knob at the bottom-left of the control panel steplessly adjusts the heater current from fully-off to fully-on. As the heaters warm and cool, their resistance changes slightly, which causes the current to drift away somewhat from the intended setting. Thus, it is necessary to readjust the electrical current back to the desired setting a few minutes after changing the setting to obtain a precise heat level.
 
-## Ammeter: The ammeter is on the upper-left of the control panel. It measures the electrical current flowing through the heaters. Each mark on the meter corresponds to 0.5-Ampere. One can convert the displayed electrical current to the consumed power with the formula P=I*E, where P is the power (watts), I is the current intensity (amperes), and E is the electromotive force (volts). Alternatively, use an energy monitor such as a KIll-a-Watt®.
+## Ammeter: 
 
-## Blower Control: The blower is multi-purpose; it moves air through the roaster, removes chaff from the roasting chamber, and can cool the roasted beans. The knob at the bottom-right of the control panel steplessly adjusts the blower level. There are two versions of this control. On some models, the blower is always on. On other models, the blower stays off from the lowest setting to about 3.8, at which point it begins to turn. Although the dial has higher graduations, it does not turn past 8.
+The ammeter is on the upper-left of the control panel. It measures the electrical current flowing through the heaters. Each mark on the meter corresponds to 0.5-Ampere. One can convert the displayed electrical current to the consumed power with the formula P=I*E, where P is the power (watts), I is the current intensity (amperes), and E is the electromotive force (volts). Alternatively, use an energy monitor such as a KIll-a-Watt®.
 
-## Thermometer: The bean temperature displayed on the thermometer is a relative value, not the actual bean temperature. The BT indicated by thermometers on all roasters varies, mainly depending on the probe’s placement and the batch size. It is advisable to correlate the displayed temperature to the actual bean temperature at known points. The appendix contains a table to record corrected values for future reference. The temperature displayed via the ET port, on the other hand, is accurate.
+## Blower Control: 
+
+The blower is multi-purpose; it moves air through the roaster, removes chaff from the roasting chamber, and can cool the roasted beans. The knob at the bottom-right of the control panel steplessly adjusts the blower level. There are two versions of this control. On some models, the blower is always on. On other models, the blower stays off from the lowest setting to about 3.8, at which point it begins to turn. Although the dial has higher graduations, it does not turn past 8.
+
+## Thermometer: 
+
+The bean temperature displayed on the thermometer is a relative value, not the actual bean temperature. The BT indicated by thermometers on all roasters varies, mainly depending on the probe’s placement and the batch size. It is advisable to correlate the displayed temperature to the actual bean temperature at known points. The appendix contains a table to record corrected values for future reference. The temperature displayed via the ET port, on the other hand, is accurate.
 
 ## Circuit Breaker: 
+
 The circuit breaker is at the roaster’s back, next to the power cord. It shuts down the roaster if there is a failure causing an excessive current draw. If the roaster does not operate, reset the breaker by depressing the button. If the breaker opens again, the roaster needs repair.
 
 # Roasting process:
+
 We roast our own coffee in the coffeehouse on a weekly basis. There are two primary things to know about our coffee roasting: the roasting degrees, the height of the coffee trays, and the oven temperatures.
 
 ## Roasting Degrees:
@@ -100,12 +110,14 @@ For better understanding, we describe temperature rules with boundary temperatur
 	However, for piles of other heights, roasting oven 1 should remain between 200° and 560° including both temperatures. These piles of other sizes can also accept temperatures of at least 300° and up to 660° for roasting chamber 2, however, if they surpass 760° or if the temperature drops below 400° at roasting oven 3, then the final product will undoubtedly be rejected. Finally, please respect that in order to achieve the first crack in the coffee beans, oven chamber 4 should go as high as 680° but not drop below 320°.
 
 
-# Additional Information
+# Additional Information:
 
-## Increasing Capacity by painting the drum
+## Increasing Capacity by painting the drum:
+
 Some Quest owners–to increase the maximum batch capacity or alter the roast environment’s thermal dynamics–paint the roasting drum’s exterior with high-heat matte black spray paint. Doing so causes the drum to efficiently absorb and conduct more infrared heat to the roast chamber independent of airflow speed (convection). Increasing the drum’s ability to absorb infrared heat increases the batch capacity, and heat changes are faster, even for large batch sizes (EG. <10 minutes, 300g roasts on an 400° M3).
 
-## Coffee Bean Cooling
+## Coffee Bean Cooling:
+
 The supplied rectangular bean collector placed in the chaff collector cools the beans. This works but has several drawbacks. First, it is slow. Second, there is no air circulation through the roasting chamber with the bean collector inserted into the chaff collector. Use an external cooler instead, such as the optional one from the manufacturer or make one. Make a small box with a muffin fan in it and set the bean collector on top. The flow of ambient air through the beans is much more efficient than the Quests’ inbuilt cooling function.
 
 
