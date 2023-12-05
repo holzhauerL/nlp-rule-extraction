@@ -1,0 +1,50 @@
+<!-- Dataset Variables Explanation:
+
+	-> applicability: final process step which determines if the methodology can be applied.
+        - applicability: methodology is applicable.
+        - non-applicability: methodology is not applicable.
+				
+-->
+
+<!-- Golden Standard: applicability -->
+
+c1 = ({check project type}, {check connection type}, {directly follows}, {project type == new installation OR project type == replacing existing fossil-fuel-fired generation})
+ 
+c2 = ({check connection type}, {check power plant type}, {directly follows}, {connection type == limited to supplying individual households with stand-alone electricity systems AND connection type != new grid connections planned at any time during the crediting period})
+
+c3 = ({check connection type}, {check grid exceptions}, {directly follows}, {connection type != limited to supplying individual households with stand-alone electricity systems AND connection type != new grid connections planned at any time during the crediting period})
+
+c4 = ({check grid exceptions}, {check power plant type}, {directly follows}, {sum of installed capacities of all renewable energy units < 15 MW OR (project involves renewable energy-based lighting applications AND emission reductions per system < 5 tonnes of CO2e a year AND (demonstration == representative sample OR demonstration == official statistics)) OR (electricity available in any given calendar month < 36 hours OR grid connected household coverage in the host country < 50%)})
+
+c5 = ({check power plant type}, {check heat and power cogeneration}, {directly follows}, {power plant type != hydro power plant})
+
+c6 = ({check power plant type}, {check hydro power plant conditions}, {directly follows}, {power plant type == hydro power plant})
+
+c7 = ({check hydro power plant conditions}, {check heat and power cogeneration}, {directly follows}, {(reservoir == existing AND volume of reservoir == no change) OR (reservoir == existing AND volume of reservoir == increased AND power denisity > 4 W/m^2) OR (reservoir == new AND power denisity > 4 W/m^2)})
+
+c8 = ({check heat and power cogeneration}, {check non-renewable components}, {directly follows}, {system != combined heat and power cogeneration})
+
+c9 = ({check non-renewable components}, {check retrofit or replacement}, {directly follows}, {(electricity generation unit added == both renewable and non-renewable AND capacity of renewable components < 15 MW) OR electricity generation unit added == renewable only})
+
+c10 = ({check retrofit or replacement}, {check existing renewable electricity generation facility}, {directly follows}, {((implementation for existing renewable electricity generation == retrofit OR implementation for existing renewable electricity generation == replacement) AND final output of modified or retrofitted components < 15 MW) OR (implementation for existing renewable electricity generation != retrofit AND implementation for existing renewable electricity generation != replacement)})
+
+c11 = ({check existing renewable electricity generation facility}, {applicability}, {directly follows}, {implementation for existing renewable electricity generation != addition OR (implementation for existing renewable electricity generation == addition AND total capacity of added units < 15 MW AND typpe of units added == physically distinct from existing units)})
+
+
+<!-- Golden Standard: non-applicability -->
+
+c12 = ({check project type}, {non-applicability}, {directly follows}, {project type != new installation AND project type != replacing existing fossil-fuel-fired generation})
+
+c13 = ({check connection type}, {non-applicability}, {directly follows}, {connection type == new grid connections planned at any time during the crediting period})
+
+c14 = ({check grid exceptions}, {non-applicability}, {directly follows}, {sum of installed capacities of all renewable energy units >= 15 MW OR (project involves renewable energy-based lighting applications AND emission reductions per system >= 5 tonnes of CO2e a year OR (demonstration != representative sample AND demonstration != official statistics)) OR (electricity available in any given calendar month > 36 hours AND grid connected household coverage in the host country > 50%)})
+
+c15 = ({check hydro power plant conditions}, {non-applicability}, {directly follows}, {(reservoir == existing AND volume of reservoir == decreased) OR (reservoir == existing AND volume of reservoir == increased AND power denisity <= 4 W/m^2) OR (reservoir == new AND power denisity <= 4 W/m^2)})
+
+c16 = ({check heat and power cogeneration}, {non-applicability}, {directly follows}, {system == combined heat and power cogeneration})
+
+c17 = ({check non-renewable components}, {non-applicability}, {directly follows}, {(electricity generation unit added == both renewable and non-renewable AND capacity of renewable components >= 15 MW)})
+
+c18 = ({check retrofit or replacement}, {non-applicability}, {directly follows}, {((implementation for existing renewable electricity generation == retrofit OR implementation for existing renewable electricity generation == replacement) AND final output of modified or retrofitted components >= 15 MW)})
+
+c19 = ({check existing renewable electricity generation facility}, {non-applicability}, {directly follows}, {implementation for existing renewable electricity generation == addition AND (total capacity of added units >= 15 MW OR typpe of units added != physically distinct from existing units)})
