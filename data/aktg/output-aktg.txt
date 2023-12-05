@@ -1,0 +1,71 @@
+<!-- Dataset Variables Explanation:
+
+	Actors and Entities:
+	
+	-> TBD if needed
+
+	
+	Variables:
+
+	-> representative_authorisation: authorisation type of representatives
+			- Binary value: 0 = notary and 1 = not_notary
+
+	-> deed_founders: determines if founders are contained in the deed
+			- Binary value: 0 = contained and 1 = not_contained
+
+	-> deed_share_capital_details: determines if the share capital details are contained in the deed
+			- Binary value: 0 = contained and 1 = not_contained
+
+	-> deed_amount_share_capital: determines if founders the amount of share capital is contained in the deed
+			- Binary value: 0 = contained and 1 = not_contained
+
+	-> determination_company_details: determines if the company details are contained in the determination of the by-laws
+			- Binary value: 0 = contained and 1 = not_contained
+
+	-> determination_enterprise_purpose: determines if the enterprise purpose is contained in the determination of the by-laws
+			- Binary value: 0 = contained and 1 = not_contained
+
+	-> determination_amount_share_capital: determines if the amount of share capital is contained in the determination of the by-laws
+			- Binary value: 0 = contained and 1 = not_contained
+
+	-> determination_share_capital_details: determines if the share capital details are contained in the determination of the by-laws
+			- Binary value: 0 = contained and 1 = not_contained
+
+	-> determination_share_characteristics: determines if the share characteristics are contained in the determination of the by-laws
+			- Binary value: 0 = contained and 1 = not_contained
+
+	-> determination_management_board: determines if the setup of the management baord is contained in the determination of the by-laws
+			- Binary value: 0 = contained and 1 = not_contained
+
+	-> requirements_for_notices: determines if requirements for company's notices by publication exist
+			- Binary value: 0 = requirements and 1 = no_requirements
+
+	-> present_act_compliance: determines if by-laws comply with present act
+			- Binary value: 0 = compliant and 1 = not_compliant
+
+	-> permission_for_deviation: determines if a permission for a deviation from the present act exists
+			- Binary value: 0 = permission and 1 = no_permission
+
+
+			
+-->
+<!--  TBD if sentence needed-->
+c1 = ({check certification of authorised representatives}, {check completeness of deed}, {directly follows}, {representative_authorisation == notary})
+
+<!--  TBD if sentence needed-->
+c2 = ({check completeness of deed}, {check completeness of determination by by-laws}, {directly follows}, {deed_founders == contained AND deed_share_capital_details == contained AND deed_amount_share_capital == contained})
+
+<!--  TBD if sentence needed-->
+c3 = ({check completeness of determination by by-laws}, {check requirements for company's notices by publication}, {directly follows}, {determination_company_details == contained AND determination_enterprise_purpose == contained AND determination_amount_share_capital == contained AND determination_share_capital_details == contained AND determination_share_characteristics == contained AND determination_management_board == contained})
+
+<!--  TBD if sentence needed-->
+c4 = ({check requirements for company's notices by publication}, {check if by-laws comply with present act}, {directly follows}, {requirements_for_noticese == requirements})
+
+<!--  TBD if sentence needed-->
+c5 = ({check if by-laws comply with present act}, {establish by-laws}, {directly follows}, {present_act_compliance == compliant})
+
+<!--  TBD if sentence needed-->
+c6 = ({check if by-laws comply with present act}, {check permission for deviation}, {directly follows}, {present_act_compliance == not_compliant})
+
+<!--  TBD if sentence needed-->
+c7 = ({check permission for deviation}, {establish by-laws}, {directly follows}, {permission_for_deviation == permission})

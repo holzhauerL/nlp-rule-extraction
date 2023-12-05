@@ -1,8 +1,4 @@
 <!-- Dataset Variables Explanation:
-
-	-> applicability: final process step which determines if the methodology can be applied.
-        - applicability: methodology is applicable.
-        - non-applicability: methodology is not applicable.
 				
 -->
 

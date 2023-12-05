@@ -1,0 +1,31 @@
+Section 34
+
+(1) An application for the grant of a patent for an 
+    invention is to be filed with the German Patent 
+    and Trade Mark Office.
+...
+
+(3) The application must contain:
+
+...
+
+1.  the name of the applicant;
+
+2.  a request for the grant of a patent which clearly and concisely describes the invention;
+
+3.  one or more patent claims which indicate what is to be protected as patentable;
+
+4.  a description of the invention;
+
+5.  the drawings referred to in the patent claims or the description.
+
+(4) The application must disclose the invention in a manner which is sufficiently clear and complete for it to be carried out by a person skilled in the art.
+
+(5) The application must relate to one invention only or to a group of inventions so linked as to form a single general inventive concept.
+
+(6) The Federal Ministry of Justice and Consumer Protection is authorised to issue, by statutory instrument, provisions concerning the form and other requirements of the application. It may, by statutory instrument, delegate this authorisation to the German Patent and Trade Mark Office.
+
+(7) At the request of the German Patent and Trade Mark Office the applicant is to specify the state of the art to the best of his or her knowledge, fully and truthfully, and to include it in the description (subsection (3)).
+
+(8) The Federal Ministry of Justice and Consumer Protection is authorised to issue, by statutory instrument, provisions concerning the deposit of biological material, access to biological material, including those persons who are entitled to access biological material, and the redeposit of biological material where an invention involves the use of or concerns biological material which is not available to the public and cannot be described in the application in such a manner as to enable the invention to be carried out by a person skilled in the art (subsection (4)). The Federal Ministry of Justice and Consumer Protection may, by statutory instrument, delegate this authorisation to the German Patent and Trade Mark Office.
+
