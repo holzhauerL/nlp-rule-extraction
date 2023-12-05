@@ -1,5 +1,4 @@
 import os
-import sys
 import pickle
 from termcolor import colored
 import pandas as pd
