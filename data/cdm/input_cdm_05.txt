@@ -1,0 +1,50 @@
+<!--
+	Source for this methodology guideline:
+		-> UNFCCC CDM, AMS-I.A.: Electricity generation by the user --- Version 19.0, https://cdm.unfccc.int/methodologies/DB/1TIFADHWTMIW25TAL778RLEFJ6AWBB, accessed Nov 11 2023
+->>
+
+# Scope
+
+This category comprises renewable electricity generation units, such as solar photovoltaic, hydro, wind and renewable biomass that supply electricity to individual households/users or groups of households/users.
+
+# Applicability
+
+The methodology is applicable to project activities that involve new installations (greenfield) or replace existing onsite fossil-fuel-fired generation.
+
+The applicability of the methodology is limited to individual households and users that do not have a grid connection except when:
+
+(a) A group of households or users are supplied with electricity through a standalone mini-grid powered by renewable energy generation unit(s) where the capacity of the generating units does not exceed 15 MW (i.e. the sum of installed capacities of all renewable energy units connected to the mini-grid is less than 15 MW), e.g. a community-based stand-alone off-the-grid renewable electricity systems; or
+
+(b) For renewable energy-based lighting applications, the emission reductions per system is less than 5 tonnes of CO2e a year and it shall be demonstrated that that fossil fuels would have been used in the absence of the project activity by:
+
+(i) A representative sample survey of target households; or
+
+(ii) Official statistics from the host country government agencies;
+
+(c) A group of households or users are connected to a grid prior to the start date of the project activity (or the start date of validation with due justification), however the electricity from the grid is available for the households and users for less than 36 hours in any given calendar month during the crediting period or the grid connected household coverage in the host country is less than 50%.
+
+The methodology is not applicable to project activities that include units that will be connected to the grid at any time during the crediting period.
+
+Hydro power plants with reservoirs that satisfy at least one of the following conditions are eligible to apply this methodology:
+
+(a) The project activity is implemented in an existing reservoir with no change in the volume of reservoir;
+
+(b) The project activity is implemented in an existing reservoir, where the volume of reservoir is increased and the power density of the project activity is greater than 4 W/m2;
+
+(c) The project activity results in new reservoirs and the power density of the power plant, is greater than 4 W/m2.
+
+Combined heat and power (cogeneration) systems are not eligible under this category.
+
+If the electricity generation unit added has both renewable and non-renewable components (e.g. a wind/diesel unit), the eligibility limit of 15 MW for a small-scale CDM project activity applies only to the renewable component. If the unit added co-fires fossil fuel, the capacity of the entire unit shall not exceed the limit of 15 MW.
+
+Project activities that involve retrofit or replacement of an existing renewable electricity generation unit are included in this category. To qualify as a small-scale project, the total output of the modified or retrofitted unit shall not exceed the limit of 15 MW.
+
+In the case of project activities that involve the addition of renewable electricity generation units to an existing renewable electricity generation facility, the total capacity of the units added by the project should be lower than 15 MW and should be physically distinct from the existing units.
+
+# Entry into force
+
+The date of entry into force is the date of the publication of the EB  115 meeting report on 8 September 2022.
+
+# Applicability of sectoral scopes
+
+For validation and verification of CDM projects and programme of activities by a designated operational entity (DOE) using this methodology, application of sectoral scope 01 is mandatory and application of sectoral scope 13 and 15 is conditional.

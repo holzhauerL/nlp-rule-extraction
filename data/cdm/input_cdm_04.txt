@@ -1,0 +1,27 @@
+<!--
+	Source for this methodology guideline:
+		-> UNFCCC CDM, AMS-II.Q.: Energy efficiency and/or energy supply projects in commercial buildings --- Version 1.0, https://cdm.unfccc.int/methodologies/DB/YCL1T3NURPHKSHBSR8TIHC2T543HTQ, accessed Jan 15 2024
+->>
+
+# Scope
+
+This methodology is applicable to on-site building energy supply and whole building energy efficiency projects whose associated emission reductions can be determined with a whole building computerized simulation tool. 
+
+# Applicability
+
+The methodology applies to commercial buildings for both retrofit and new construction (i.e. Greenfield) projects. Allowable projects include energy efficient building design features; energy efficient appliances, equipment and/or technologies; energy management controls; on-site renewable energy projects; on-site cogeneration; and/or fossil fuel switching – alone or in combination. 
+
+All technologies (e.g. equipment or appliances) used in the project activity must be new and not transferred from another project activity.
+
+This methodology is not applicable to project activities that affect off-site district heating and/or cooling plants and distribution networks even if they supply energy to the subject building(s). 
+
+If the energy efficient equipment contains refrigerants, then the refrigerant used in the project case shall have no Ozone Depleting Potential (ODP). 
+
+If the project activity includes fuel switching, the requirements in AMS-III.B “Switching fossil fuels” for establishing a baseline for fuel switching shall be followed. 
+
+None of the project equipment, systems or actions used for claiming emission reductions may be included in another CDM project in order to avoid possible double counting of emission reductions. 
+
+The Project Design Document (PDD) shall document how the potential for double counting of emission reductions, for example due to equipment manufacturers or others claiming credit for emission reductions for project activities, are avoided. 
+
+The aggregate electricity savings by a single project shall not exceed 60 GWh per year.
+

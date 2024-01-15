@@ -1,0 +1,24 @@
+<!--
+	Source for this methodology guideline:
+		-> UNFCCC CDM, AR-AM0014: Afforestation and reforestation of degraded mangrove habitats --- Version 3.0, https://cdm.unfccc.int/methodologies/DB/KMH6O8T6RL3P5XKNBQE2N359QG7KOE, accessed Jan 15 2024
+->>
+
+# Scope
+
+This methodology applies to afforestation and reforestation (A/R) project activities implemented in degraded mangrove habitats. 
+
+# Applicability
+
+This methodology is applicable under the following conditions:
+
+(a) The land subject to the project activity is degraded mangrove habitat;
+
+(b) More than 90 per cent of the project area is planted with mangrove species. If more than 10 per cent of the project area is planted with non-mangrove species then the project activity does not lead to alteration of hydrology of the project area and hydrology of connected up-gradient and down-gradient wetland area;
+
+(c) Soil disturbance attributable to the A/R clean development mechanism (CDM) project activity does not cover more than 10 per cent of area.
+
+A project activity applying this methodology shall also comply with the applicability conditions of the tools contained within the methodology and applied by the project activity.
+
+# Entry into force
+
+The date of entry into force of the revision is the date of the publication of the EB 75 meeting report on 4 October 2013.

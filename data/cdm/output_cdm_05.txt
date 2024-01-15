@@ -1,0 +1,99 @@
+<!-- Dataset Variables Explanation:
+
+        -> project_type: determines the type of the renewable energy project
+                - ENUM:
+                        new_installation
+                        replacing_fossil_fuel
+                        other
+
+        -> connection_type: determines which units are connected to the grid
+                - Binary value: 1 = individual_households and 0 = other
+
+        -> grid_connection: determines if a prior grid connection existed for all connected units
+                - Binary value: 1 = exisiting and 0 = other
+
+        -> sum_of_all_capacities: capacity of the sum of the energy generation units of the electricity grid in MW
+                - Float value (rounded to two decimals)
+
+        -> project_applications: determines if the project involves a renewable energy-based lighting application
+                - Binary value: 1 = involves_renewable_lighting and 0 = no_renewable_lighting
+
+        -> emission_reductions: emissions reduced by renewable energy-based lighting application in tonnes of CO2e a year
+                - Float value (rounded to two decimals)
+
+        -> demonstration: process to demonstrate that fossil fuels would have been used in the absence of the project activity
+                - ENUM:
+                        representative_sample
+                        official_statistics
+                        other
+
+        -> available_electricity: electricity availabilty in any given calendar month in hours prior to the start of the project for the group of supplied households 
+                - Float value (rounded to two decimals)
+
+        -> coverage: grid connected household coverage in the host country in %
+                - Float value (rounded to two decimals)
+
+        -> power_plant_type: determines the type of the power plant
+                - Binary value: 1 = hydro_power_plant and 0 = other
+
+        -> reservoir: determines if a reservoir of a hydro power plant existied prior to the project or if it is new
+                - Binary value: 1 = exisiting and 0 = new
+
+        -> reservoir_volume: determines if the volume of the reservoir increased
+                - Binary value: 1 = increased and 0 = no_change
+
+        -> power_denisity: power density of the project activity in W/m^2
+                - Float value (rounded to two decimals)
+
+        -> system: determines if heat and power are cogenerated
+                - Binary value: 1 = combined_heat_and_power and 0 = other
+
+        -> unit_added: determines if added electricty generating units are only renewable or also contain non-renewable components
+                - Binary value: 1 = renewable_only and 0 = renewable_and_non_renewable
+
+        -> capacity_renewable: electricity generation capacity of the added renewable units in MW
+                - Float value (rounded to two decimals)
+
+        -> implementation: type of implementation of the project activity
+                - ENUM:
+                        retrofit
+                        replacement
+                        addition
+
+        -> final_output: electricity generation of the modified or retrofitted unit in MW
+                - Float value (rounded to two decimals)
+
+        -> addition_of_renewable_units: determines if an addition of renewable units is part of the project activity
+                - Binary value: 1 = addition and 0 = no_addition
+
+        -> capacity_added: electricity generation capacity of the added renewable units in MW
+                - Float value (rounded to two decimals)
+
+        -> type_of_units_added: determines if the added units are physically_distinct
+                - Binary value: 1 = physically_distinct and 0 = other
+				
+-->
+
+<!-- Gold Standard -->
+
+c1 = ({check project type}, {check connection type}, {directly follows}, {project_type == new_installation OR project_type == replacing_fossil_fuel})
+ 
+c2 = ({check connection type}, {check power plant type}, {directly follows}, {connection_type == individual_households AND grid_connection == existing})
+
+c3 = ({check connection type}, {check grid exceptions}, {directly follows}, {connection_type != individual_households AND grid_connection == existing})
+
+c4 = ({check grid exceptions}, {check power plant type}, {directly follows}, {(sum_of_all_capacities < 15) OR (project_applications == involves_renewable_lighting AND emission_reductions < 5 AND (demonstration == representative_sample OR demonstration == official_statistics)) OR (available_electricity < 36 OR coverage < 50)})
+
+c5 = ({check power plant type}, {check heat and power cogeneration}, {directly follows}, {power_plant_type != hydro_power_plant})
+
+c6 = ({check power plant type}, {check hydro power plant conditions}, {directly follows}, {power_plant_type == hydro_power_plant})
+
+c7 = ({check hydro power plant conditions}, {check heat and power cogeneration}, {directly follows}, {(reservoir == existing AND reservoir_volume == no_change) OR (reservoir == existing AND reservoir_volume == increased AND power_denisity > 4) OR (reservoir == new AND power_denisity > 4)})
+
+c8 = ({check heat and power cogeneration}, {check non-renewable components}, {directly follows}, {system != combined_heat_and_power})
+
+c9 = ({check non-renewable components}, {check retrofit or replacement}, {directly follows}, {(unit_added == renewable_and_non_renewable AND capacity_renewable < 15) OR (unit_added == renewable_only)})
+
+c10 = ({check retrofit or replacement}, {check existing renewable electricity generation facility}, {directly follows}, {((implementation == retrofit OR implementation == replacement) AND final_output < 15) OR (implementation != retrofit AND implementation != replacement)})
+
+c11 = ({check existing renewable electricity generation facility}, {apply methodology}, {directly follows}, {addition_of_renewable_units == no_addition OR (addition_of_renewable_units == addition AND capacity_added < 15 AND type_of_units_added == physically_distinct)})

@@ -1,0 +1,76 @@
+<!-- Dataset Variables Explanation:
+
+	-> building_type: type of building that is the subject of the project
+			- Binary value: 1 = commercial_building and 0 = other
+
+	-> project_nature: nature of construction operation
+			- ENUM: 
+			 	retrofit
+				new_construction
+				other
+
+	-> project_type: specific type of construction / retrofit project
+			- ENUM:
+				ee_building_design_features
+				ee_appliances_equip_tech
+				e_mm_controls
+				os_renewable_e_projects
+				os_cogeneration
+				fossil_fuel_switching
+
+	-> technologies_used: types of technologies used as part of the project
+			- Binary value: 1 = new and 0 = transferred
+
+	-> activity_affects: entities that project activities can influence
+			- ENUM:
+				os_district_heating_plant
+				os_district_cooling_plant
+				distribution_networks
+
+	-> refrigerant: refrigerator contained in the energy efficient equipment
+			- Binary value: 1 = contained and 0 =  not_contained
+
+	-> refrigerant_type: determines if refrigerator contains ozone depleting potential (ODP)
+			- Binary value: 1 = odp and 0 = no_odp
+
+	-> activity_type: determines if project contains fuel switch related activities
+			- Binary value: 1 = fuel_switch and 0 = no_fuel_switch
+
+	-> emission_reductions: determines if project equipment, systems or actions (used to claim emission reductions) are unique / only counted once
+			- Binary value: 1 = unique and 0 = not_unique
+
+	-> project_design_document: determines if project design document exists
+			- Binary value: 1 = existent and 0 = non_existent
+
+	-> electricity_savings: annual amount of electricity savings in GWh by a single project
+			- Float value (rounded to two decimals) 
+
+-->
+
+<!-- Gold Standard -->
+
+c1 = ({check building type}, {check relevant project characteristics}, {directly follows}, {building_type == commercial_building})
+
+c2 = ({check relevant project characteristics}, {check technologies used}, {directly follows}, {(project_nature == retrofit OR project_nature == new_construction) AND (project_type == ee_building_design_features OR project_type == ee_appliances_equip_tech OR project_type == e_mm_controls OR project_type == os_renewable_e_projects OR project_type == os_cogeneration OR project_type == fossil_fuel_switching)})
+
+c3 = ({check technologies used}, {check affect of project activities}, {directly follows}, {technologies_used == new})
+
+c4 = ({check affect of project activities}, {check if equipment contains refrigerator}, {directly follows}, {activity_affects != os_district_heating_plant OR activity_affects != os_district_cooling_plant OR activity_affects != distribution_networks})
+
+c5 = ({check if equipment contains refrigerator}, {check refrigerant type}, {directly follows}, {refrigerant == contained})
+
+c6 = ({check if equipment contains refrigerator}, {check fuel switch}, {directly follows}, {refrigerant == not_contained})
+
+c7 = ({check refrigerant type}, {check fuel switch}, {directly follows}, {refrigerant == no_odp})
+
+c8 = ({check fuel switch}, {follow AMS-III.B}, {directly follows}, {activity_type == fuel_switch})
+
+c9 = ({check fuel switch}, {check claimed emission reductions}, {directly follows}, {activity_type != fuel_switch})
+
+c10 = ({follow AMS-III.B}, {check claimed emission reductions}, {directly follows}, {activity_type == fuel_switch})
+
+c11 = ({check claimed emission reductions}, {check existence of project design document}, {directly follows}, {emission reductions == unique})
+
+c12 = ({check existence of project design document}, {check annual aggregate electricity savings}, {directly follows}, {project_design_document == existent})
+
+c13 = ({check annual aggregate electricity savings}, {apply methodolgy}, {directly follows}, {electricity_savings <= 60})

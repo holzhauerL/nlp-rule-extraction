@@ -1,0 +1,26 @@
+<!--
+	Source for this methodology guideline:
+		-> UNFCCC CDM, AMS-III.U.: Cable Cars for Mass Rapid Transit System (MRTS) --- Version 2.0, https://cdm.unfccc.int/methodologies/DB/I7O8EX3R0PA22GNGBJMH2FHCOIL03L, accessed Jan 15 2024
+->>
+
+# Scope
+
+This category comprises cable cars substituting traditional road-based transport trips.
+
+The calculation of baseline and project emissions is based on total emissions from trip origin (O) to trip destination (D) using distinctive modes of transport.
+
+# Applicability
+
+The methodology is applicable to project activities that reduce emissions through the construction and operation of new cable cars for passenger transport wherein the passenger performs partial or total trip on the cable car. Extensions of existing cable cars are not eligible under this methodology.
+
+Cable cars are established as a means of mass transit. The cable car must be built in an area that is accessible by road, i.e. origin and final destination of the cable car;
+
+Fuels used in the baseline and or project case are electricity, gaseous or liquid fossil fuels. If Bio fuel blends are used as liquid fuels, the specific fuel consumption value and emission factors used for determining baseline and project emissions shall be adjusted accordingly.
+
+The analysis of possible baseline scenario alternatives leads to the baseline scenario of continuation of the current public transport system that reasonably represents the anthropogenic emissions by sources of greenhouse gases (GHG) that would occur in the absence of the proposed project activity.
+
+Measures are limited to those that result in emission reductions of less than or equal to 60 kt CO2e annually.
+
+# Entry into force
+
+The date of entry into force is the date of the publication of the EB 85 meeting report on 24 July 2015.

@@ -1,0 +1,36 @@
+<!-- Dataset Variables Explanation:
+
+	-> project_context: context of cable car construction. Substitution of traditional road-based transport trips or other context
+			- Binary value: 1 = substitution and 0 = other
+
+	-> relevancy_for_trip: is cable car part of a / a total trip of a passenger
+			- ENUM: 
+				part_of_trip
+				total_trip
+				other
+
+	-> project_type: is project an extension of an existing cable car
+			-Binary value: 1 = extension and 0 = no_extension
+
+	-> cable_car_accessibility: accessibility of origin and final destination of cable car
+			- Binary value: 1 = accessible_by_road and 0 = not_accessible_by_road
+
+	-> compliance_of_fuels: compliant if fuels used are electricity, gaseous or liquid fossil fuels (incl. bio fuels)
+			- Binary value: 1 = compliant and 0 = not_compliant
+
+	-> annual_emission_reductions: annual amount of emission reductions in kt CO2e
+			- Float value (rounded to two decimals)
+
+-->
+
+<!-- Gold Standard -->
+
+c1 = ({check project context}, {check impact on emissions}, {directly follows}, {project_context == substitution})
+
+c2 = ({check impact on emissions}, {check accessibility by road}, {directly follows}, {(relevancy_for_trip == part_of_trip OR relevancy_for_trip == total_trip) AND project_type == no_extension})
+
+c3 = ({check accessibility by road}, {check compliance of fuels used in baseline or project case}, {directly follows}, {cable_car_accessibility == accessible_by_road})
+
+c4 = ({check compliance of fuels used in baseline or project case}, {check emission reductions of measures}, {directly follows}, {fuel_complinace == compliant})
+
+c5 = ({check emission reductions of measures}, {apply methodology}, {directly follows}, {annual_emission_reductions <= 60})

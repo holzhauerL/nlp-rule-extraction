@@ -1,60 +1,45 @@
 <!-- Dataset Variables Explanation:
 
-	Actors and Entities:
-	
-	-> TBD if needed
-
-	
-	Variables:
-
-	-> nature_of_prod_or_serv: determines if products or services (contained in the application) can be calssified as an invention
-			- Binary value: 0 = invention and 1 = no_invention
+	-> nature_of_prod_or_serv: determines if products or services (contained in the application) can be classified as an invention
+			- Binary value: 1 = invention and 0 = no_invention
 
 	-> authority_type: determines authority type
-			- Binary value: 0 = gptmo and 1 = other
+			- Binary value: 1 = german_patent_and_trade_mark_office and 0 = other
 
 	-> application_name: determines if name is contained in application
-			- Binary value: 0 = contained and 1 = not_contained
+			- Binary value: 1 = contained and 0 = not_contained
 
 	-> application_request_for_grant: determines if request for grant is contained in application
-			- Binary value: 0 = contained and 1 = not_contained
+			- Binary value: 1 = contained and 0 = not_contained
 
 	-> application_patent_claim: determines if patent claim is contained in application
-			- Binary value: 0 = contained and 1 = not_contained
+			- Binary value: 1 = contained and 0 = not_contained
 
 	-> application_description: determines if description is contained in application
-			- Binary value: 0 = contained and 1 = not_contained
+			- Binary value: 1 = contained and 0 = not_contained
 
 	-> application_drawings: determines if drawings are contained in application
-			- Binary value: 0 = contained and 1 = not_contained
+			- Binary value: 1 = contained and 0 = not_contained
 
 	-> application_clarity: clarity of the content / information contained in the application
-			- Binary value: 0 = clear and 1 = unclear
+			- Binary value: 1 = clear and 0 = unclear
 
 	-> number_of_inventions: number of inventions contained in application
 			- Integer value
 
 	-> content_relationship: determines if inventions contained in the same application belong together
-			- Binary value: 0 = together and 1 = seperate
-
-
-
-			
+			- Binary value: 1 = together and 0 = seperate
 -->
-<!--  TBD if sentence needed-->
+
+<!--  Gold Standard -->
 c1 = ({check if invention}, {check if competent authority}, {directly follows}, {nature_of_prod_or_serv == invention})
 
-<!--  TBD if sentence needed-->
-c2 = ({check if competent authority}, {check completeness and clarity of application}, {directly follows}, {authority_type == gptmo})
+c2 = ({check if competent authority}, {check completeness and clarity of application}, {directly follows}, {authority_type == german_patent_and_trade_mark_office})
 
-<!--  TBD if sentence needed-->
 c3 = ({check completeness and clarity of application}, {check number of contained inventions}, {directly follows}, {application_name == contained AND application_request_for_grant == contained AND application_patent_claim == contained AND application_description == contained AND application_drawings == contained AND application_clarity == clear})
 
-<!--  TBD if sentence needed-->
 c4 = ({check number of contained inventions}, {file application}, {directly follows}, {number_of_inventions == 1})
 
-<!--  TBD if sentence needed-->
 c5 = ({check number of contained inventions}, {check if inventions are linked}, {directly follows}, {number_of_inventions > 1})
 
-<!--  TBD if sentence needed-->
 c6 = ({check if inventions are linked}, {file application}, {directly follows}, {content_relationship == together})

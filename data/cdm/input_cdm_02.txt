@@ -1,0 +1,26 @@
+<!--
+	Source for this methodology guideline:
+		-> UNFCCC CDM, AR-AMS0007: Afforestation and reforestation project activities implemented on lands other than wetlands --- Version 3.1, https://cdm.unfccc.int/methodologies/DB/J6ZHLX1C3AEMSZ52PWIII6D2AOJZUB, accessed Jan 15 2024
+->>
+
+# Scope
+
+This methodology is applicable to small-scale afforestation and reforestation (A/R) project activities under the clean development mechanism (CDM). It does not apply to large-scale A/R CDM project activities.
+
+# Applicability
+
+This methodology is applicable under the following conditions:
+
+(a) The land subject to the project activity does not fall in wetland category;
+
+(b) Soil disturbance attributable to the project activity does not cover more than 10 per cent of area in each of the following types of land, when these lands are included within the project boundary:
+
+(i) Land containing organic soils;
+
+(ii) Land which, in the baseline, is subjected to land-use and management practices and receives inputs listed in appendices 2 and 3 to this methodology.
+
+A project activity applying this methodology shall also comply with the applicability conditions of the tools contained within the methodology and applied by the project activity.
+
+# Entry into force
+
+The date of entry into force is the date of the publication of the EB 85 meeting report on 24 July 2015.

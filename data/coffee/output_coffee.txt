@@ -1,0 +1,67 @@
+<!-- Dataset Variables Explanation:
+
+	-> height: maximum height in millimetres of the coffee beans in the tray
+			- Float value (rounded to two decimals)
+	
+	-> roasting_degree: roasting degree of the coffee beans
+			- ENUM: 
+				- light
+				- medium
+				- dark
+			
+	-> t1: measured temperature in °C for roasting chamber 1
+			- Float value (rounded to two decimals)
+				
+	-> t2: measured temperature in °C for roasting chamber 2
+			- Float value (rounded to two decimals)
+						
+	-> t3: measured temperature in °C for roasting chamber 3
+			- Float value (rounded to two decimals)
+						
+	-> t4: measured temperature in °C for roasting chamber 4
+			- Float value (rounded to two decimals)
+						
+	-> t5: measured temperature in °C for roasting chamber 5
+			- Float value (rounded to two decimals)		
+				
+-->
+
+<!-- Topology Order -->
+c1 = ({go to roasting chamber 3}, {go to roasting chamber 4}, {directly follows}, {roasting_degree == medium OR roasting_degree == dark})
+c2 = ({go to roasting chamber 4}, {go to roasting chamber 5}, {directly follows}, {roasting_degree == dark})
+
+
+<!-- Gold Standard: light -->
+c3 = ({go to roasting chamber 1}, {go to roasting chamber 2}, {directly follows}, {roasting_degree == light AND height < 180 AND 120 <= t1 <= 400})
+c4 = ({go to roasting chamber 2}, {go to roasting chamber 3}, {directly follows}, {roasting_degree == light AND height < 180 AND 220 <= t2 <= 500})
+c5 = ({go to roasting chamber 3}, {retrieve final product}, {directly follows}, {roasting_degree == light AND height < 180 AND t3 <= 550})
+
+c6 = ({go to roasting chamber 1}, {go to roasting chamber 2}, {directly follows}, {roasting_degree == light AND height >= 180 AND 140 <= t1 <= 420})
+c7 = ({go to roasting chamber 2}, {go to roasting chamber 3}, {directly follows}, {roasting_degree == light AND height >= 180 AND 240 <= t2 <= 520})
+c8 = ({go to roasting chamber 3}, {retrieve final product}, {directly follows}, {roasting_degree == light AND height >= 180 AND t3 <= 570})
+
+
+<!-- Gold Standard: medium -->
+c9 = ({go to roasting chamber 1}, {go to roasting chamber 2}, {directly follows}, {roasting_degree == medium AND height < 170 AND 170 <= t1 <= 450})
+c10 = ({go to roasting chamber 2}, {go to roasting chamber 3}, {directly follows}, {roasting_degree == medium AND height < 170 AND 270 <= t2 <= 550})
+c11 = ({go to roasting chamber 3}, {go to roasting chamber 4}, {directly follows}, {roasting_degree == medium AND height < 170 AND 370 <= t3 <= 650})
+c12 = ({go to roasting chamber 4}, {retrieve final product}, {directly follows}, {roasting_degree == medium AND height < 170 AND t4 <= 550})
+
+c13 = ({go to roasting chamber 1}, {go to roasting chamber 2}, {directly follows}, {roasting_degree == medium AND height >= 170 AND 450 < t1 < 170})
+c14 = ({go to roasting chamber 2}, {go to roasting chamber 3}, {directly follows}, {roasting_degree == medium AND height >= 170 AND 550 < t2 < 270})
+c15 = ({go to roasting chamber 3}, {go to roasting chamber 4}, {directly follows}, {roasting_degree == medium AND height >= 170 AND 650 < t3 < 370})
+c16 = ({go to roasting chamber 4}, {retrieve final product}, {directly follows}, {roasting_degree == medium AND height >= 170 AND t4 <= 550})
+
+
+<!-- Gold Standard: dark -->
+c17 = ({go to roasting chamber 1}, {go to roasting chamber 2}, {directly follows}, {roasting_degree == dark AND height < 175 AND 200 <= t1 <= 560})
+c18 = ({go to roasting chamber 2}, {go to roasting chamber 3}, {directly follows}, {roasting_degree == dark AND height < 175 AND 300 <= t2 <= 660})
+c19 = ({go to roasting chamber 3}, {go to roasting chamber 4}, {directly follows}, {roasting_degree == dark AND height < 175 AND 400 <= t3 <= 760})
+c20 = ({go to roasting chamber 4}, {go to roasting chamber 5}, {directly follows}, {roasting_degree == dark AND height < 175 AND 300 <= t4 <= 660})
+c21 = ({go to roasting chamber 5}, {retrieve final product}, {directly follows}, {roasting_degree == dark AND height < 175 AND t4 <= 560})
+
+c22 = ({go to roasting chamber 1}, {go to roasting chamber 2}, {directly follows}, {roasting_degree == dark AND height >= 175 AND 220 <= t1 <= 580})
+c23 = ({go to roasting chamber 2}, {go to roasting chamber 3}, {directly follows}, {roasting_degree == dark AND height >= 170 AND 320 <= t2 <= 680})
+c24 = ({go to roasting chamber 3}, {go to roasting chamber 4}, {directly follows}, {roasting_degree == dark AND height >= 170 AND 420 <= t3 <= 780})
+c25 = ({go to roasting chamber 4}, {go to roasting chamber 5}, {directly follows}, {roasting_degree == dark AND height >= 170 AND 320 <= t4 <= 680})
+c26 = ({go to roasting chamber 5}, {retrieve final product}, {directly follows}, {roasting_degree == dark AND height >= 170 AND t4 <= 580})

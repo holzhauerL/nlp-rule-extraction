@@ -1,0 +1,30 @@
+<!-- Dataset Variables Explanation:
+
+	-> activity_type: type of project activities
+			- Binary value: 1 = ar_activitiy and 0 = other_activity 
+
+	-> habitat_type: wetland / habitat classification
+			- Binary value: 1 = degraded_mangrove_habitat and 0 = other_habitat
+
+	-> magrove_species: percentage of species categorisable as mangroves
+			- Float value (rounded to two decimals)
+
+	-> area_percentage: percentage of area covered by soil disturbance attributable to the project activity mechanism (CDM)
+			- Float value (rounded to two decimals)
+
+	-> contained_tools_compliance: compliance of tools used within the methodology
+			- Binary value: 1 = compliant and 0 = non_compliant 
+			
+-->
+
+<!-- Gold Standard -->
+
+c1 = ({check project activities}, {check habitat}, {directly follows}, {activity_type == ar_activitiy})
+
+c2 = ({check habitat}, {check percentage of mangrove species}, {directly follows}, {habitat_type == degraded_mangrove_habitat})
+
+c3 = ({check percentage of mangrove species}, {check soil disturbance attributable to project}, {directly follows}, {mangrove_species > 90})
+
+c4 = ({check soil disturbance attributable to project}, {check compliance with applicability conditions of contained tools}, {directly follows}, {area_percentage <= 10})
+
+c5 = ({check compliance with applicability conditions of contained tools}, {apply methodology}, {directly follows}, {contained_tools_compliance == compliant})
