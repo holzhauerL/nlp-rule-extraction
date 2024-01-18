@@ -6,6 +6,7 @@ import spacy
 from spacy.lang.en.stop_words import STOP_WORDS
 import numerizer
 
+
 def txt_to_df(file_path, section_start="# ", subsection_start="## "):
     """
     Reads the text from a .txt file in a certain format, breaks it down into lines and returns it as a pandas Dataframe, organised into sections and subsections. 
@@ -70,6 +71,7 @@ def rmv_and_rplc(text, remove=["\n", "\t"], replace={"->": "leads to", "-->": "l
 
     return text
 
+
 def chng_stpwrds(add=[],remove=[],remove_numbers=False,restore_default=False, default_filename = 'stopwords_en.pickle',verbose=False, model='en_core_web_lg'):
     """
     Adds and removes stop words to the default of spacy. 
@@ -79,7 +81,7 @@ def chng_stpwrds(add=[],remove=[],remove_numbers=False,restore_default=False, de
     :param restore_default: Flag to restore the default stop word selection provided by spacy. 
     :param default_filename: Name of the file with the default stop words. Only relevant if restore_default == True.
     :param verbose: If True, stop words are printed.
-    :param model: Pretrained spacy pipeline to use.
+    :param model: Pretrained spacy pipeline to use. Default is en_core_web_lg (large). Other options are en_core_web_md (medium-sized) and en_core_web_sm (small).
     :return: Stop words.
     """
 
@@ -118,12 +120,11 @@ def chng_stpwrds(add=[],remove=[],remove_numbers=False,restore_default=False, de
             print(word)
     return stpwrds
 
-# Function to lemmatize and remove stop words
 def lmtz_and_rmv_stpwrds(text, model='en_core_web_lg', verbose=False):
     """
     Remove stop words and lemmatize text. 
     :param text: Text input from which stop words are removed and which is lemmatized.
-    :param model: Pretrained spacy pipeline to use.
+    :param model: Pretrained spacy pipeline to use. Default is en_core_web_lg (large). Other options are en_core_web_md (medium-sized) and en_core_web_sm (small).
     :param verbose: If True, removed stop words are printed.
     :return: Processed text.
     """

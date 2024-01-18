@@ -1,4 +1,22 @@
 import docx2txt
+import sys
+import subprocess
+import spacy
+
+
+def ld_spcy_mdl(model):
+    """
+    Evaluating if the pretrained spaCy model is already installed, and installing it, if it itsn't. 
+    :param model: Name of the pretrained spacy model. 
+    """
+    try:
+        # Try to load the spaCy model
+        spacy.load(model)
+        print('The model', model, 'is already installed!')
+    except OSError:
+        # If loading fails, install the model using subprocess
+        print("Installing", model, "model...")
+        subprocess.check_call([sys.executable, "-m", "spacy", "download", model])
 
 # TODO: Generalize
 def docx_to_txt(docx_path='EB115.docx',txt_path='output.txt'):

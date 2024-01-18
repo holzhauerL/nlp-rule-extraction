@@ -10,6 +10,8 @@ For questions please contact leo.holzhauer@tum.de.
 3. Run requirements.txt.
 4. Download spacy packages with this command in terminal: `python -m spacy download en_core_web_lg`
 
+During the execution of the script, a pretrained spacy pipeline is used for various tasks, such as tokenization. It is automatically downloaded, if not yet present in your local environment. The  default is `en_core_web_lg` (large), which takes up to 600 MB of storage. Alternatives for reduced memory usage are `en_core_web_md` (medium) and `en_core_web_sm` (small). However, these might reduce model performance. 
+
 ## Overview
 
 ### Used Data Sources
