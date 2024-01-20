@@ -31,11 +31,13 @@ Hydro power plants with reservoirs that satisfy at least one of the following co
 
 (b) The project activity is implemented in an existing reservoir, where the volume of reservoir is increased and the power density of the project activity is greater than 4 W/m2;
 
-(c) The project activity results in new reservoirs and the power density of the power plant, is greater than 4 W/m2.
+(c) The project activity results in new reservoirs and the power density of the power plant is greater than 4 W/m2.
 
 Combined heat and power (cogeneration) systems are not eligible under this category.
 
-If the electricity generation unit added has both renewable and non-renewable components (e.g. a wind/diesel unit), the eligibility limit of 15 MW for a small-scale CDM project activity applies only to the renewable component. If the unit added co-fires fossil fuel, the capacity of the entire unit shall not exceed the limit of 15 MW.
+If the electricity generation unit added has both renewable and non-renewable components (e.g. a wind/diesel unit), the eligibility limit of 15 MW for a small-scale CDM project activity applies only to the renewable component. 
+
+If the unit added co-fires fossil fuel, the capacity of the entire unit shall not exceed the limit of 15 MW.
 
 Project activities that involve retrofit or replacement of an existing renewable electricity generation unit are included in this category. To qualify as a small-scale project, the total output of the modified or retrofitted unit shall not exceed the limit of 15 MW.
 

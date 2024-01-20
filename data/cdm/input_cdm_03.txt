@@ -13,7 +13,7 @@ The calculation of baseline and project emissions is based on total emissions fr
 
 The methodology is applicable to project activities that reduce emissions through the construction and operation of new cable cars for passenger transport wherein the passenger performs partial or total trip on the cable car. Extensions of existing cable cars are not eligible under this methodology.
 
-Cable cars are established as a means of mass transit. The cable car must be built in an area that is accessible by road, i.e. origin and final destination of the cable car;
+Cable cars are established as a means of mass transit. The cable car must be built in an area that is accessible by road, i.e. origin and final destination of the cable car.
 
 Fuels used in the baseline and or project case are electricity, gaseous or liquid fossil fuels. If Bio fuel blends are used as liquid fuels, the specific fuel consumption value and emission factors used for determining baseline and project emissions shall be adjusted accordingly.
 

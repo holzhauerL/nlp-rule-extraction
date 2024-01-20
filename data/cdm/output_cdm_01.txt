@@ -1,30 +1,33 @@
 <!-- Dataset Variables Explanation:
 
-	-> activity_type: type of project activities
-			- Binary value: 1 = ar_activitiy and 0 = other_activity 
+	-> project_activity: type of project activities
+			- ENUM:
+				afforestation
+				reforestation
+				other
 
-	-> habitat_type: wetland / habitat classification
+	-> land_project_activity: wetland / habitat classification
 			- Binary value: 1 = degraded_mangrove_habitat and 0 = other_habitat
 
-	-> magrove_species: percentage of species categorisable as mangroves
+	-> project_area_with_mangrove: percentage of project area planted with mangrove species
 			- Float value (rounded to two decimals)
 
-	-> area_percentage: percentage of area covered by soil disturbance attributable to the project activity mechanism (CDM)
+	-> soil_disturbance_area: percentage of area covered by soil disturbance attributable to the project activity mechanism (CDM)
 			- Float value (rounded to two decimals)
 
-	-> contained_tools_compliance: compliance of tools used within the methodology
-			- Binary value: 1 = compliant and 0 = non_compliant 
+	-> comply_with_contained_tools: compliance of tools used within the methodology
+			- Boolean: True or False
 			
 -->
 
 <!-- Gold Standard -->
 
-c1 = ({check project activities}, {check habitat}, {directly follows}, {activity_type == ar_activitiy})
+c1 = ({check project activity}, {check habitat}, {directly follows}, {project_activity == afforestation OR project_activity == reforestation})
 
-c2 = ({check habitat}, {check percentage of mangrove species}, {directly follows}, {habitat_type == degraded_mangrove_habitat})
+c2 = ({check habitat}, {check percentage of mangrove species}, {directly follows}, {land_type == degraded_mangrove_habitat})
 
-c3 = ({check percentage of mangrove species}, {check soil disturbance attributable to project}, {directly follows}, {mangrove_species > 90})
+c3 = ({check percentage of mangrove species}, {check soil disturbance attributable to project}, {directly follows}, {project_area_with_mangrove > 90})
 
-c4 = ({check soil disturbance attributable to project}, {check compliance with applicability conditions of contained tools}, {directly follows}, {area_percentage <= 10})
+c4 = ({check soil disturbance attributable to project}, {check compliance with applicability conditions of contained tools}, {directly follows}, {soil_disturbance_area <= 10})
 
-c5 = ({check compliance with applicability conditions of contained tools}, {apply methodology}, {directly follows}, {contained_tools_compliance == compliant})
+c5 = ({check compliance with applicability conditions of contained tools}, {apply methodology}, {directly follows}, {comply_with_contained_tools == True})

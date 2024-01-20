@@ -1,35 +1,43 @@
 <!-- Dataset Variables Explanation:
 
+	-> project_activity: type of project activities
+			- ENUM:
+				afforestation
+				reforestation
+				other
+
 	-> project_scope: scope of the A / R project
 			- Binary value: 1 = large_scale and 0 = small_scale
 
-	-> activity_type: type of project activities
-			- Binary value: 1 = ar_activitiy and 0 = other_activity
-
-	-> land_type: type of land subject to project activity
+	-> land_project_activity: type of land subject to project activity
 			- Binary value: 1 = wetland and 0 = other_land 
 
-	-> soil_organicity: determines if soil is organic
-			- Binary value: 1 = organic and 0 = not_organic 
+	-> containing_organic_soils: determines if the land contains organic soils
+			- Boolean: True or False
 
-	-> lu_mm_practices_subj_input: determines if land is subject to land-use and management practices and recieves (relevant) input of different kinds
-			- Binary value: 1 = subject_and_input and 0 = not_subject_no_input 
+	-> land_subject_to_land_use_and_management: determines if land is subject to land-use and management practices
+			- Boolean: True or False
+	
+	-> receives_listed_inputs: determines if land which is subject to land-use and management practices recieves (relevant) input of different kinds
+			- Boolean: True or False
 
-	-> area_percentage: percentage of area covered by soil disturbance attributable to the project activity
+	-> soil_disturbance_area: percentage of area covered by soil disturbance attributable to the project activity
 			- Float value (rounded to two decimals)
 
-	-> contained_tools_compliance: compliance of tools used within the methodology
-			- Binary value: 1 = compliant and 0 = non_compliant 
+	-> comply_with_contained_tools: compliance of tools used within the methodology
+			- Boolean: True or False
 			
 -->
 
 <!-- Gold Standard -->
 
-c1 = ({check project scope and activities}, {check type of land}, {directly follows}, {project_scope == small_scale AND activity_type == ar_activity})
+c1 = ({check project activity}, {check scope}, {directly follows}, {project_activity == afforestation OR project_activity == reforestation})
 
-c2 = ({check type of land}, {check soil disturbance attributable to project}, {directly follows}, {land_type != wetland})
+c2 = ({check scope}, {check type of land}, {directly follows}, {project_scope != large_scale})
 
-c3 = ({check soil disturbance attributable to project}, {check compliance with applicability conditions of contained tools}, {directly follows}, {(soil_organicity == not_organic OR (soil_organicity == organic AND area_percentage <= 10)) AND (lu_mm_practices_subj_input == not_subject_no_input OR (lu_mm_practices_subj_input == subject_and_input AND area_percentage <= 10))})
+c3 = ({check type of land}, {check soil disturbance attributable to project}, {directly follows}, {land_project_activity != wetland})
 
-c4 = ({check compliance with applicability conditions of contained tools}, {apply methodolgy}, {directly follows}, {contained_tools_compliance == compliant})
+c4 = ({check soil disturbance attributable to project}, {check compliance with applicability conditions of contained tools}, {directly follows}, {(containing_organic_soils == False OR (containing_organic_soils == True AND soil_disturbance_area <= 10)) AND (land_subject_to_land_use_and_management == False OR (land_subject_to_land_use_and_management == True AND  receives_listed_inputs == True AND soil_disturbance_area <= 10))})
+
+c5 = ({check compliance with applicability conditions of contained tools}, {apply methodolgy}, {directly follows}, {comply_with_contained_tools == True})
 

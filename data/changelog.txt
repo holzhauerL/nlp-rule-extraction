@@ -1,0 +1,426 @@
+# output_aktg
+----
+ADD
+----
+
+--
+c1 = ({check notary requirement}, {check authorised representatives}, {directly follows}, {recorded_by_notary == True})
+--
+
+----
+EDIT
+----
+
+--
+c1 = ({check certification of authorised representatives}, {check completeness of deed}, {directly follows}, {representative_authorisation == notary})
+>>>
+c2 = ({check authorised representatives}, {check deed}, {directly follows}, {certified_power_of_attorney == True})
+--
+
+--
+c2 = ({check completeness of deed}, {check completeness of determination by by-laws}, {directly follows}, {deed_founders == contained AND deed_share_capital_details == contained AND deed_amount_share_capital == contained})
+>>>
+c3 = ({check deed}, {check determination by by-laws}, {directly follows}, {deed_founders == True AND ((par_value_shares == True AND deed_shares_nominal_amount == True) OR (par_value_shares == False AND deed_shares_number == True AND deed_issue_price == True AND deed_classes_of_stocks == True))AND deed_amount_share_capital == True})
+--
+
+--
+c3 = ({check completeness of determination by by-laws}, {check requirements for company's notices by publication}, {directly follows}, {determination_company_details == contained AND determination_enterprise_purpose == contained AND determination_amount_share_capital == contained AND determination_share_capital_details == contained AND determination_share_characteristics == contained AND determination_management_board == contained})
+>>>
+c4 = ({check determination by by-laws}, {check requirements for company's notices by publication}, {directly follows}, {determination_company_name == True AND determination_company_seat == True AND determination_enterprise_purpose == True AND determination_amount_share_capital == True AND ((par_value_shares == True AND determination_shares_nominal_amount == True AND determination_number_of_shares_per_nominal_amount == True) OR (par_value_shares == False AND determination_shares_number == True AND determination_classes_of_stocks == True)) AND determination_share_characteristics == True AND (determination_management_board_numbers == True OR determination_management_board_rules == True)})
+--
+
+--
+c4 = ({check requirements for company's notices by publication}, {check if by-laws comply with present act}, {directly follows}, {requirements_for_noticese == requirements})
+>>>
+c5 = ({check requirements for company's notices by publication}, {check if by-laws comply with present act}, {directly follows}, {formal_requirements_included == True})
+--
+
+--
+c5 = ({check if by-laws comply with present act}, {establish by-laws}, {directly follows}, {present_act_compliance == compliant})
+>>>
+c6 = ({check if by-laws comply with present act}, {establish by-laws}, {directly follows}, {present_act_compliance == True})
+--
+
+--
+c6 = ({check if by-laws comply with present act}, {check permission for deviation}, {directly follows}, {present_act_compliance == not_compliant})
+>>>
+c7 = ({check if by-laws comply with present act}, {check permission for deviation}, {directly follows}, {present_act_compliance == True})
+--
+
+--
+c7 = ({check permission for deviation}, {establish by-laws}, {directly follows}, {permission_for_deviation == permission})
+>>>
+c8 = ({check permission for deviation}, {establish by-laws}, {directly follows}, {permission_for_deviation == True})
+--
+
+# output_cdm_01
+
+----
+EDIT
+----
+
+--
+c1 = ({check project activities}, {check habitat}, {directly follows}, {activity_type == ar_activitiy})
+>>>
+c1 = ({check project activity}, {check habitat}, {directly follows}, {project_activity == afforestation OR project_activity == reforestation})
+--
+
+--
+c2 = ({check habitat}, {check percentage of mangrove species}, {directly follows}, {habitat_type == degraded_mangrove_habitat})
+>>>
+c2 = ({check habitat}, {check percentage of mangrove species}, {directly follows}, {land_project_activity == degraded_mangrove_habitat})
+--
+
+--
+c3 = ({check percentage of mangrove species}, {check soil disturbance attributable to project}, {directly follows}, {mangrove_species > 90})
+>>>
+c3 = ({check percentage of mangrove species}, {check soil disturbance attributable to project}, {directly follows}, {project_area_with_mangrove > 90})
+--
+
+--
+c4 = ({check soil disturbance attributable to project}, {check compliance with applicability conditions of contained tools}, {directly follows}, {area_percentage <= 10})
+>>>
+c4 = ({check soil disturbance attributable to project}, {check compliance with applicability conditions of contained tools}, {directly follows}, {soil_disturbance_area <= 10})
+--
+
+--
+c5 = ({check compliance with applicability conditions of contained tools}, {apply methodology}, {directly follows}, {contained_tools_compliance == compliant})
+>>>
+c5 = ({check compliance with applicability conditions of contained tools}, {apply methodology}, {directly follows}, {comply_with_contained_tools == True})
+--
+
+# output_cdm_02
+
+----
+ADD
+----
+
+--
+c2 = ({check scope}, {check type of land}, {directly follows}, {project_scope != large_scale})
+--
+
+----
+EDIT
+----
+
+--
+c1 = ({check project scope and activities}, {check type of land}, {directly follows}, {project_scope == small_scale AND activity_type == ar_activity})
+>>>
+c1 = ({check project activity}, {check scope}, {directly follows}, {project_activity == afforestation OR project_activity == reforestation})
+--
+
+--
+c2 = ({check type of land}, {check soil disturbance attributable to project}, {directly follows}, {land_type != wetland})
+>>>
+c3 = ({check type of land}, {check soil disturbance attributable to project}, {directly follows}, {land_project_activity != wetland})
+--
+
+--
+c3 = ({check soil disturbance attributable to project}, {check compliance with applicability conditions of contained tools}, {directly follows}, {(soil_organicity == not_organic OR (soil_organicity == organic AND area_percentage <= 10)) AND (lu_mm_practices_subj_input == not_subject_no_input OR (lu_mm_practices_subj_input == subject_and_input AND area_percentage <= 10))})
+>>>
+c4 = ({check soil disturbance attributable to project}, {check compliance with applicability conditions of contained tools}, {directly follows}, {(containing_organic_soils == False OR (containing_organic_soils == True AND soil_disturbance_area <= 10)) AND (land_subject_to_land_use_and_management == False OR (land_subject_to_land_use_and_management == True AND  receives_listed_inputs == True AND soil_disturbance_area <= 10))})
+--
+
+--
+c4 = ({check compliance with applicability conditions of contained tools}, {apply methodolgy}, {directly follows}, {contained_tools_compliance == compliant})
+>>>
+c5 = ({check compliance with applicability conditions of contained tools}, {apply methodolgy}, {directly follows}, {comply_with_contained_tools == True})
+--
+
+# output_cdm_03
+
+----
+ADD
+----
+
+--
+c3 = ({check extension}, {check accessibility by road}, {directly follows}, {extension == False})
+--
+
+----
+EDIT
+----
+
+--
+c1 = ({check project context}, {check impact on emissions}, {directly follows}, {project_context == substitution})
+>>>
+c1 = ({check project activity}, {check emission reduction}, {directly follows}, {category == cable_car_substituting_road_based_transport})
+--
+
+--
+c2 = ({check impact on emissions}, {check accessibility by road}, {directly follows}, {(relevancy_for_trip == part_of_trip OR relevancy_for_trip == total_trip) AND project_type == no_extension})
+>>>
+c2 = ({check emission reduction}, {check extension}, {directly follows}, {relevancy_for_trip == part_of_trip OR relevancy_for_trip == total_trip})
+--
+
+--
+c3 = ({check accessibility by road}, {check compliance of fuels used in baseline or project case}, {directly follows}, {cable_car_accessibility == accessible_by_road})
+>>>
+c4 = ({check accessibility by road}, {check compliance of fuels used in baseline or project case}, {directly follows}, {cable_car_accessibility == accessible_by_road})
+--
+
+--
+c4 = ({check compliance of fuels used in baseline or project case}, {check emission reductions of measures}, {directly follows}, {fuel_complinace == compliant})
+>>>
+c5 = ({check compliance of fuels used in baseline or project case}, {check emission reductions of measures}, {directly follows}, {bio_fuel_blends_used == False OR (bio_fuel_blends_used == True AND specific_fuel_consumption_value_adjusted == True)})
+--
+
+--
+c5 = ({check emission reductions of measures}, {apply methodology}, {directly follows}, {annual_emission_reductions <= 60})
+>>>
+c6 = ({check emission reductions of measures}, {apply methodology}, {directly follows}, {emission_reductions_annually <= 60})
+--
+
+# output_cdm_04
+
+----
+ADD
+----
+
+--
+c1 = ({check project activity}, {check building type}, {directly follows}, {project_activity == on_site_building_energy_supply OR project_activity == whole_building_energy_efficiency})
+--
+
+----
+REMOVE
+----
+
+--
+c5 = ({check if equipment contains refrigerator}, {check refrigerant type}, {directly follows}, {refrigerant == contained})
+--
+
+--
+c7 = ({check refrigerant type}, {check fuel switch}, {directly follows}, {refrigerant == no_odp})
+--
+
+--
+c9 = ({check fuel switch}, {check claimed emission reductions}, {directly follows}, {activity_type != fuel_switch})
+--
+
+--
+c10 = ({follow AMS-III.B}, {check claimed emission reductions}, {directly follows}, {activity_type == fuel_switch})
+--
+
+----
+EDIT
+----
+
+--
+c1 = ({check building type}, {check relevant project characteristics}, {directly follows}, {building_type == commercial_building})
+>>>
+c2 = ({check building type}, {check project characteristics}, {directly follows}, {building_type == commercial_building AND (project_nature == retrofit OR project_nature == new_construction)})
+--
+
+--
+c2 = ({check relevant project characteristics}, {check technologies used}, {directly follows}, {(project_nature == retrofit OR project_nature == new_construction) AND (project_type == ee_building_design_features OR project_type == ee_appliances_equip_tech OR project_type == e_mm_controls OR project_type == os_renewable_e_projects OR project_type == os_cogeneration OR project_type == fossil_fuel_switching)})
+>>>
+c3 = ({check project characteristics}, {check technologies used}, {directly follows}, {project_type == energy_efficient_building_design_features OR project_type == energy_efficient_appliances_equipment_technologies OR project_type == energy_management_controls OR project_type == on_site_renewable_energy_projects OR project_type == on_site_cogeneration OR project_type == fossil_fuel_switching_alone OR fossil_fuel_switching_combination})
+--
+
+--
+c3 = ({check technologies used}, {check affect of project activities}, {directly follows}, {technologies_used == new})
+>>>
+c4 = ({check technologies used}, {check affect of project activities}, {directly follows}, {technologies_used == new AND transferred_from_another_project == False})
+--
+
+--
+c4 = ({check affect of project activities}, {check if equipment contains refrigerator}, {directly follows}, {activity_affects != os_district_heating_plant OR activity_affects != os_district_cooling_plant OR activity_affects != distribution_networks})
+>>>
+c5 = ({check affect of project activities}, {check refrigerant}, {directly follows}, {project_activity_affects != on_site_district_heating_plant OR project_activity_affects != on_site_district_cooling_plant OR project_activity_affects != distribution_networks})
+--
+
+--
+c6 = ({check if equipment contains refrigerator}, {check fuel switch}, {directly follows}, {refrigerant == not_contained})
+>>>
+c6 = ({check refrigerant}, {check fuel switch}, {directly follows}, {energy_efficient_equipment_contain_refrigerant == False OR (energy_efficient_equipment_contain_refrigerant == True AND ozone_depleting_potential == False)})
+--
+
+--
+c8 = ({check fuel switch}, {follow AMS-III.B}, {directly follows}, {activity_type == fuel_switch})
+>>>
+c7 = ({check fuel switch}, {check claimed emission reductions}, {directly follows}, {project_activity_includes_fuel_switching == False OR (project_activity_includes_fuel_switching == True AND requirements_followed == True)})
+--
+
+--
+c11 = ({check claimed emission reductions}, {check existence of project design document}, {directly follows}, {emission reductions == unique})
+>>>
+c8 = ({check claimed emission reductions}, {check project design document}, {directly follows}, {emission_reductions_included_in_other_project == False})
+--
+
+--
+c12 = ({check existence of project design document}, {check annual aggregate electricity savings}, {directly follows}, {project_design_document == existent})
+>>>
+c9 = ({check project design document}, {check aggregate electricity savings}, {directly follows}, {project_design_document == document_avoidance_of_potential_for_double_counting})
+--
+
+--
+c13 = ({check annual aggregate electricity savings}, {apply methodolgy}, {directly follows}, {electricity_savings <= 60})
+>>>
+c13 = ({check aggregate electricity savings}, {apply methodolgy}, {directly follows}, {electricity_savings_per_year <= 60})
+--
+
+# output_cdm_05
+
+----
+ADD
+----
+
+--
+c1 = ({check category}, {check project activity}, {directly follows}, {category == renewable_electricity_generation_units})
+--
+
+--
+c6 = ({check grid connection}, {check power plant type}, {directly follows}, {includes_grid_connected_units == False})
+--
+
+--
+c12 = ({check fossil fuel}, {check retrofit or replacement}, {directly follows}, {co_fires_fossil_fuel == False OR (co_fires_fossil_fuel == True AND capacity_entire_unit < 15)})
+--
+
+----
+EDIT
+----
+
+--
+c1 = ({check project type}, {check connection type}, {directly follows}, {project_type == new_installation OR project_type == replacing_fossil_fuel})
+>>>
+c2 = ({check project activity}, {check connection type}, {directly follows}, {project_activity == involve_new_installation OR project_activity == replace_existing_on_site_fossil_fuel})
+--
+
+--
+c2 = ({check connection type}, {check power plant type}, {directly follows}, {connection_type == individual_households AND grid_connection == existing})
+>>>
+c3 = ({check connection type}, {check grid connection}, {directly follows}, {individual_households == True AND grid_connection == False})
+--
+
+--
+c3 = ({check connection type}, {check grid exceptions}, {directly follows}, {connection_type != individual_households AND grid_connection == existing})
+>>>
+c4 = ({check connection type}, {check grid exceptions}, {directly follows}, {individual_households == True AND grid_connection == True})
+--
+
+--
+c4 = ({check grid exceptions}, {check power plant type}, {directly follows}, {(sum_of_all_capacities < 15) OR (project_applications == involves_renewable_lighting AND emission_reductions < 5 AND (demonstration == representative_sample OR demonstration == official_statistics)) OR (available_electricity < 36 OR coverage < 50)})
+>>>
+c5 = ({check grid exceptions}, {check grid connection}, {directly follows}, {capacity_of_generating_units < 15 OR (renewable_energy_based_lighting_application == True AND emission_reductions_per_system_a_year < 5 AND (demonstration == representative_sample_survey OR demonstration == official_statistics)) OR (electricity_from_grid_available < 36 OR grid_connected_household_coverage < 50)})
+--
+
+--
+c5 = ({check power plant type}, {check heat and power cogeneration}, {directly follows}, {power_plant_type != hydro_power_plant})
+>>>
+c7 = ({check power plant type}, {check heat and power cogeneration}, {directly follows}, {hydro_power_plant == False})
+--
+
+--
+c6 = ({check power plant type}, {check hydro power plant conditions}, {directly follows}, {power_plant_type == hydro_power_plant})
+>>>
+c8 = ({check power plant type}, {check hydro power plant conditions}, {directly follows}, {hydro_power_plant == True})
+--
+
+--
+c7 = ({check hydro power plant conditions}, {check heat and power cogeneration}, {directly follows}, {(reservoir == existing AND reservoir_volume == no_change) OR (reservoir == existing AND reservoir_volume == increased AND power_denisity > 4) OR (reservoir == new AND power_denisity > 4)})
+>>>
+c9 = ({check hydro power plant conditions}, {check heat and power cogeneration}, {directly follows}, {(implemented_in_existing_reservoir == existing AND volume_of_reservoir_changed == False) OR (implemented_in_existing_reservoir == True AND volume_of_reservoir_increased == True AND power_denisity > 4) OR (results_in_new_reservoir == True AND power_denisity > 4)})
+--
+
+--
+c8 = ({check heat and power cogeneration}, {check non-renewable components}, {directly follows}, {system != combined_heat_and_power})
+>>>
+c10 = ({check heat and power cogeneration}, {check non-renewable components}, {directly follows}, {combined_heat_and_power == False})
+--
+
+--
+c9 = ({check non-renewable components}, {check retrofit or replacement}, {directly follows}, {(unit_added == renewable_and_non_renewable AND capacity_renewable < 15) OR (unit_added == renewable_only)})
+>>>
+c11 = ({check non-renewable components}, {check fossil fuel}, {directly follows}, {renewable_and_non_renewable == False OR (renewable_and_non_renewable == True AND capacity_renewable < 15)})
+--
+
+--
+c10 = ({check retrofit or replacement}, {check existing renewable electricity generation facility}, {directly follows}, {((implementation == retrofit OR implementation == replacement) AND final_output < 15) OR (implementation != retrofit AND implementation != replacement)})
+>>>
+c13 = ({check retrofit or replacement}, {check existing renewable electricity generation facility}, {directly follows}, {(involve_retrofit == False AND involve_replacement == False) OR ((involve_retrofit == True OR involve_replacement == True) AND total_output < 15)})
+--
+
+--
+c11 = ({check existing renewable electricity generation facility}, {apply methodology}, {directly follows}, {addition_of_renewable_units == no_addition OR (addition_of_renewable_units == addition AND capacity_added < 15 AND type_of_units_added == physically_distinct)})
+>>>
+c14 = ({check existing renewable electricity generation facility}, {apply methodology}, {directly follows}, {involve_addition == False OR (involve_addition == True AND total_capacity_units_added < 15 AND physically_distinct == True)})
+--
+
+# output_coffee
+
+----
+EDIT
+----
+
+--
+c13 = ({go to roasting chamber 1}, {go to roasting chamber 2}, {directly follows}, {roasting_degree == medium AND height >= 170 AND 450 < t1 < 170})
+>>>
+c13 = ({go to roasting chamber 1}, {go to roasting chamber 2}, {directly follows}, {roasting_degree == medium AND height >= 170 AND 460 < t1 < 180})
+--
+
+--
+c14 = ({go to roasting chamber 2}, {go to roasting chamber 3}, {directly follows}, {roasting_degree == medium AND height >= 170 AND 550 < t2 < 270})
+>>>
+c14 = ({go to roasting chamber 2}, {go to roasting chamber 3}, {directly follows}, {roasting_degree == medium AND height >= 170 AND 570 < t2 < 290})
+--
+
+--
+c15 = ({go to roasting chamber 3}, {go to roasting chamber 4}, {directly follows}, {roasting_degree == medium AND height >= 170 AND 650 < t3 < 370})
+>>>
+c15 = ({go to roasting chamber 3}, {go to roasting chamber 4}, {directly follows}, {roasting_degree == medium AND height >= 170 AND 670 < t3 < 390})
+--
+
+--
+c16 = ({go to roasting chamber 4}, {retrieve final product}, {directly follows}, {roasting_degree == medium AND height >= 170 AND t4 <= 550})
+>>>
+c16 = ({go to roasting chamber 4}, {retrieve final product}, {directly follows}, {roasting_degree == medium AND height >= 170 AND t4 <= 560})
+--
+
+# output_patg
+
+----
+ADD
+----
+
+--
+c3 = ({check clarity of application}, {check number of contained inventions}, {application_dicslose_clear_and_complete == True})
+--
+
+----
+REMOVE
+----
+
+--
+c1 = ({check if invention}, {check if competent authority}, {directly follows}, {nature_of_prod_or_serv == invention})
+--
+
+--
+c5 = ({check number of contained inventions}, {check if inventions are linked}, {directly follows}, {number_of_inventions > 1})
+--
+
+--
+c6 = ({check if inventions are linked}, {file application}, {directly follows}, {content_relationship == together})
+--
+
+----
+EDIT
+----
+
+--
+c2 = ({check if competent authority}, {check completeness and clarity of application}, {directly follows}, {authority_type == german_patent_and_trade_mark_office})
+>>>
+c1 = ({check authority}, {check completeness of application}, {directly follows}, {application_filed_with_german_patent_and_trade_mark_office == True})
+--
+
+--
+c3 = ({check completeness and clarity of application}, {check number of contained inventions}, {directly follows}, {application_name == contained AND application_request_for_grant == contained AND application_patent_claim == contained AND application_description == contained AND application_drawings == contained AND application_clarity == clear})
+>>>
+c2 = ({check completeness of application}, {check clarity of application}, {directly follows}, {application_name == True AND application_request_for_grant == True AND application_patent_claim == True AND application_description == True AND application_drawings == True})
+--
+
+--
+c4 = ({check number of contained inventions}, {file application}, {directly follows}, {number_of_inventions == 1})
+>>>
+c4 = ({check number of contained inventions}, {file application}, {directly follows}, {application_relate_one_invention == True OR (application_relate_one_invention == False AND linked == True)})
+--

@@ -1,57 +1,90 @@
 <!-- Dataset Variables Explanation:
+	
+	-> recorded_by_notary: by-laws are established by way of being recored by a notary
+			- Boolean: True or False
 
-	-> representative_authorisation: authorisation type of representatives
-			- Binary value: 1 = notary and 0 = not_notary
+	-> certified_power_of_attorney: authorised representatives have a power of attorney certified by a notary
+			- Boolean: True or False
 
 	-> deed_founders: determines if founders are contained in the deed
-			- Binary value: 1 = contained and 0 = not_contained
+			- Boolean: True or False
 
-	-> deed_share_capital_details: determines if the share capital details are contained in the deed
-			- Binary value: 1 = contained and 0 = not_contained
+	-> par_value_shares: determines if the shares are par-value
+			- Boolean: True or False
+
+	-> deed_shares_nominal_amount: determines if the nominal amount of par-value shares is contained in the deed
+			- Boolean: True or False
+
+	-> deed_shares_number: determines if the number of shares for no-par-value shares is contained in the deed
+			- Boolean: True or False
+
+	-> deed_issue_price: determines if the issue price for no-par-value shares is contained in the deed
+			- Boolean: True or False
+
+	-> deed_classes_of_stocks: determines if the classes of stocks for no-par-value shares is contained in the deed
+			- Boolean: True or False
 
 	-> deed_amount_share_capital: determines if the amount of share capital is contained in the deed
-			- Binary value: 1 = contained and 0 = not_contained
+			- Boolean: True or False
 
-	-> determination_company_details: determines if the company details are contained in the determination of the by-laws
-			- Binary value: 1 = contained and 0 = not_contained
+	-> determination_company_name: determines if the company name is contained in the determination of the by-laws
+			- Boolean: True or False
+	
+	-> determination_company_seat: determines if the company seat is contained in the determination of the by-laws
+			- Boolean: True or False
 
 	-> determination_enterprise_purpose: determines if the enterprise purpose is contained in the determination of the by-laws
-			- Binary value: 1 = contained and 0 = not_contained
+			- Boolean: True or False
 
 	-> determination_amount_share_capital: determines if the amount of share capital is contained in the determination of the by-laws
-			- Binary value: 1 = contained and 0 = not_contained
+			- Boolean: True or False
 
-	-> determination_share_capital_details: determines if the share capital details are contained in the determination of the by-laws
-			- Binary value: 1 = contained and 0 = not_contained
+	-> determination_shares_nominal_amount: determines if the nominal amount of par-value shares is contained in the determination of the by-laws
+			- Boolean: True or False
+
+	-> determination_number_of_shares_per_nominal_amount: determines if the number of shares per nominal amount of par-value shares is contained in the determination of the by-laws
+			- Boolean: True or False
+
+	-> determination_shares_number: determines if the number of shares for no-par-value shares is contained in the determination of the by-laws
+			- Boolean: True or False
+
+	-> determination_classes_of_stocks: determines if the classes of stocks for no-par-value shares is contained in the determination of the by-laws
+			- Boolean: True or False
 
 	-> determination_share_characteristics: determines if the share characteristics are contained in the determination of the by-laws
-			- Binary value: 1 = contained and 0 = not_contained
+			- Boolean: True or False
 
-	-> determination_management_board: determines if the setup of the management baord is contained in the determination of the by-laws
-			- Binary value: 1 = contained and 0 = not_contained
+	-> determination_management_board_numbers: determines if the number of the management baord is contained in the determination of the by-laws
+			- Boolean: True or False
 
-	-> requirements_for_notices: determines if requirements for company's notices by publication exist
-			- Binary value: 1 = requirements and 0 = no_requirements
+	-> determination_management_board_rules: determines if the rules for the setup of the management baord is contained in the determination of the by-laws
+			- Boolean: True or False
+
+	-> formal_requirements_included: determines if requirements for company's notices by publication are met
+			- Boolean: True or False
 
 	-> present_act_compliance: determines if by-laws comply with present act
-			- Binary value: 1 = compliant and 0 = not_compliant
+			- Boolean: True or False
 
 	-> permission_for_deviation: determines if a permission for a deviation from the present act exists
-			- Binary value: 0 = permission and 1 = no_permission
+			- Boolean: True or False
 			
 -->
 
 <!--  Gold Standard -->
-c1 = ({check certification of authorised representatives}, {check completeness of deed}, {directly follows}, {representative_authorisation == notary})
 
-c2 = ({check completeness of deed}, {check completeness of determination by by-laws}, {directly follows}, {deed_founders == contained AND deed_share_capital_details == contained AND deed_amount_share_capital == contained})
+c1 = ({check notary requirement}, {check authorised representatives}, {directly follows}, {recorded_by_notary == True})
 
-c3 = ({check completeness of determination by by-laws}, {check requirements for company's notices by publication}, {directly follows}, {determination_company_details == contained AND determination_enterprise_purpose == contained AND determination_amount_share_capital == contained AND determination_share_capital_details == contained AND determination_share_characteristics == contained AND determination_management_board == contained})
+c2 = ({check authorised representatives}, {check deed}, {directly follows}, {certified_power_of_attorney == True})
 
-c4 = ({check requirements for company's notices by publication}, {check if by-laws comply with present act}, {directly follows}, {requirements_for_noticese == requirements})
+c3 = ({check deed}, {check determination by by-laws}, {directly follows}, {deed_founders == True AND ((par_value_shares == True AND deed_shares_nominal_amount == True) OR (par_value_shares == False AND deed_shares_number == True AND deed_issue_price == True AND deed_classes_of_stocks == True))AND deed_amount_share_capital == True})
 
-c5 = ({check if by-laws comply with present act}, {establish by-laws}, {directly follows}, {present_act_compliance == compliant})
+c4 = ({check determination by by-laws}, {check requirements for company's notices by publication}, {directly follows}, {determination_company_name == True AND determination_company_seat == True AND determination_enterprise_purpose == True AND determination_amount_share_capital == True AND ((par_value_shares == True AND determination_shares_nominal_amount == True AND determination_number_of_shares_per_nominal_amount == True) OR (par_value_shares == False AND determination_shares_number == True AND determination_classes_of_stocks == True)) AND determination_share_characteristics == True AND (determination_management_board_numbers == True OR determination_management_board_rules == True)})
 
-c6 = ({check if by-laws comply with present act}, {check permission for deviation}, {directly follows}, {present_act_compliance == not_compliant})
+c5 = ({check requirements for company's notices by publication}, {check if by-laws comply with present act}, {directly follows}, {formal_requirements_included == True})
 
-c7 = ({check permission for deviation}, {establish by-laws}, {directly follows}, {permission_for_deviation == permission})
+c6 = ({check if by-laws comply with present act}, {establish by-laws}, {directly follows}, {present_act_compliance == True})
+
+c7 = ({check if by-laws comply with present act}, {check permission for deviation}, {directly follows}, {present_act_compliance == True})
+
+c8 = ({check permission for deviation}, {establish by-laws}, {directly follows}, {permission_for_deviation == True})

@@ -1,45 +1,34 @@
 <!-- Dataset Variables Explanation:
-
-	-> nature_of_prod_or_serv: determines if products or services (contained in the application) can be classified as an invention
-			- Binary value: 1 = invention and 0 = no_invention
-
-	-> authority_type: determines authority type
-			- Binary value: 1 = german_patent_and_trade_mark_office and 0 = other
+	-> application_filed_with_german_patent_and_trade_mark_office: determines authority 
+			- Boolean: True or False
 
 	-> application_name: determines if name is contained in application
-			- Binary value: 1 = contained and 0 = not_contained
+			- Boolean: True or False
 
 	-> application_request_for_grant: determines if request for grant is contained in application
-			- Binary value: 1 = contained and 0 = not_contained
+			- Boolean: True or False
 
 	-> application_patent_claim: determines if patent claim is contained in application
-			- Binary value: 1 = contained and 0 = not_contained
+			- Boolean: True or False
 
 	-> application_description: determines if description is contained in application
-			- Binary value: 1 = contained and 0 = not_contained
+			- Boolean: True or False
 
 	-> application_drawings: determines if drawings are contained in application
-			- Binary value: 1 = contained and 0 = not_contained
+			- Boolean: True or False
 
-	-> application_clarity: clarity of the content / information contained in the application
-			- Binary value: 1 = clear and 0 = unclear
+	-> application_dicslose_clear_and_complete: clarity of the content / information contained in the application
+			- Boolean: True or False
 
-	-> number_of_inventions: number of inventions contained in application
-			- Integer value
-
-	-> content_relationship: determines if inventions contained in the same application belong together
-			- Binary value: 1 = together and 0 = seperate
+	-> linked: determines if inventions contained in the same application belong together
+			- Boolean: True or False
 -->
 
 <!--  Gold Standard -->
-c1 = ({check if invention}, {check if competent authority}, {directly follows}, {nature_of_prod_or_serv == invention})
+c1 = ({check authority}, {check completeness of application}, {directly follows}, {application_filed_with_german_patent_and_trade_mark_office == True})
 
-c2 = ({check if competent authority}, {check completeness and clarity of application}, {directly follows}, {authority_type == german_patent_and_trade_mark_office})
+c2 = ({check completeness of application}, {check clarity of application}, {directly follows}, {application_name == True AND application_request_for_grant == True AND application_patent_claim == True AND application_description == True AND application_drawings == True})
 
-c3 = ({check completeness and clarity of application}, {check number of contained inventions}, {directly follows}, {application_name == contained AND application_request_for_grant == contained AND application_patent_claim == contained AND application_description == contained AND application_drawings == contained AND application_clarity == clear})
+c3 = ({check clarity of application}, {check number of contained inventions}, {application_dicslose_clear_and_complete == True})
 
-c4 = ({check number of contained inventions}, {file application}, {directly follows}, {number_of_inventions == 1})
-
-c5 = ({check number of contained inventions}, {check if inventions are linked}, {directly follows}, {number_of_inventions > 1})
-
-c6 = ({check if inventions are linked}, {file application}, {directly follows}, {content_relationship == together})
+c4 = ({check number of contained inventions}, {file application}, {directly follows}, {application_relate_one_invention == True OR (application_relate_one_invention == False AND linked == True)})
