@@ -12,6 +12,10 @@ For questions please contact leo.holzhauer@tum.de.
 
 During the execution of the script, a pretrained spacy pipeline is used for various tasks, such as tokenization. It is automatically downloaded, if not yet present in your local environment. The  default is `en_core_web_lg` (large), which takes up to 600 MB of storage. Alternatives for reduced memory usage are `en_core_web_md` (medium) and `en_core_web_sm` (small). However, these might reduce model performance. 
 
+## Recommendation for Input Data
+
+1. Demark sections with '#' and subsections with '##'. 
+
 ## Overview
 
 ### Used Data Sources
