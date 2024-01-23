@@ -1,7 +1,7 @@
 import spacy
 from spacy.matcher import Matcher
 
-def gt_mtchs(nlp, text, pattern, pattern_name, model='en_core_web_lg', verbose=True, context=2):
+def gt_mtchs(nlp, text, pattern, pattern_name, verbose=True, context=2):
     """
     Returns the matches of a pattern in a text.
 
@@ -13,8 +13,6 @@ def gt_mtchs(nlp, text, pattern, pattern_name, model='en_core_web_lg', verbose=T
     :param context: Number of tokens to include for the context of the match (both sides).
     :return: Set of matches.
     """
-    # Load the spaCy model
-    nlp = spacy.load(model)
     doc = nlp(text)
 
     # Add the pattern to the matcher
