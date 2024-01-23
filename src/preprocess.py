@@ -74,17 +74,17 @@ def rmv_and_rplc(text, remove=["\n", "\t"], replace={"->": "leads to", "-->": "l
 
     return text
 
-def chng_stpwrds(add=[],remove=[],remove_numbers=False,restore_default=False, default_filename = 'stopwords_en.pickle',verbose=False, model='en_core_web_lg'):
+def chng_stpwrds(nlp, add=[],remove=[],remove_numbers=False,restore_default=False, default_filename = 'stopwords_en.pickle',verbose=False):
     """
-    Adds and removes stop words to the default of spacy. 
+    Adds and removes stop words to the default of SpaCy. 
 
+    :param nlp: Pre-loaded SpaCy model.
     :param add: Stop words to add, e.g. ["by", "the"].
     :param remove: Stop words to remove, e.g. ["to", "one"].
     :param remove_numbers: Flag to remove all numbers in natural language from the stop words list.
-    :param restore_default: Flag to restore the default stop word selection provided by spacy. 
+    :param restore_default: Flag to restore the default stop word selection provided by SpaCy. 
     :param default_filename: Name of the file with the default stop words. Only relevant if restore_default == True.
     :param verbose: If True, stop words are printed.
-    :param model: Pretrained spacy pipeline to use. Default is en_core_web_lg (large). Other options are en_core_web_md (medium-sized) and en_core_web_sm (small).
     :return: Stop words.
     """
 
@@ -95,7 +95,6 @@ def chng_stpwrds(add=[],remove=[],remove_numbers=False,restore_default=False, de
     else:
         if remove_numbers:
             stpwrds = sorted(STOP_WORDS)
-            nlp = spacy.load(model)
 
             for item in stpwrds:
                 doc = nlp(item)
@@ -123,16 +122,15 @@ def chng_stpwrds(add=[],remove=[],remove_numbers=False,restore_default=False, de
             print(word)
     return stpwrds
 
-def lmtz_and_rmv_stpwrds(text, model='en_core_web_lg', verbose=False):
+def lmtz_and_rmv_stpwrds(nlp ,text, verbose=False):
     """
     Remove stop words and lemmatize text. 
 
+    :param nlp: Pre-loaded SpaCy model.
     :param text: Text input from which stop words are removed and which is lemmatized.
-    :param model: Pretrained spacy pipeline to use. Default is en_core_web_lg (large). Other options are en_core_web_md (medium-sized) and en_core_web_sm (small).
     :param verbose: If True, removed stop words are printed.
     :return: Processed text.
     """
-    nlp = spacy.load(model)
     doc = nlp(text)
     stpwrds = set(nlp.Defaults.stop_words)
     
@@ -187,26 +185,21 @@ def determine_enum_type(sentence, enum_patterns):
     return None
 
 
-def splt_to_sntncs(text, separators=['.','!'], exceptions=True, model='en_core_web_lg', case=None):
+def split_to_chunks(nlp, text, separators=['.','!'], exceptions=True, case=None):
     """
-    Splits the input into an array of sentences.
+    Splits the input into an array of text chunks, which might be a sentence or a sequence of enuemration items.
 
+    :param nlp: Pre-loaded SpaCy model.
     :param text: Input string.
     :param separators: Array where each token determines the separation of the sentences.
     :param exceptions: Determines if exceptions should be considered or not.
-    :param model: Pretrained spacy pipeline to use. Default is en_core_web_lg (large). Other options are en_core_web_md (medium-sized) and en_core_web_sm (small).
     :param case: The use case, for quality control.
     :return: Array of sentences.
     """
-    # To keep the information of a linebreak for the enum items
-    text = text.replace("\n\n", "\n")
-    text = text.replace("\n \n", "\n")
-    text = text.replace("\n", " NEWLINE ")
-    text = text.replace("   ", " ") # remove redundant whitespaces
-    text = text.replace("  ", " ") # remove redundant whitespaces
+    # Replace and handle line breaks and spaces
+    text = text.replace("\n\n", "\n").replace("\n \n", "\n")
+    text = text.replace("\n", " NEWLINE ").replace("   ", " ").replace("  ", " ")
 
-    # Load the spaCy model for tokenization
-    nlp = spacy.load(model)
     doc = nlp(text)
 
     sentences = []
@@ -268,12 +261,12 @@ def splt_to_sntncs(text, separators=['.','!'], exceptions=True, model='en_core_w
                         start = end_of_enum + len(" NEWLINE ")
                     else:
                         start = end + 1
-                    sentence = sentence.replace("NEWLINE", "\n").replace("\n \n", "\n").lstrip("\n")
+                    sentence = sentence.replace("NEWLINE", "\n").replace("\n \n", "\n").strip()
                     sentences.append(sentence)
 
     # Add the last sentence if there is any text left
     if start < len(text):
-        last_sentence = text[start:].strip().replace("NEWLINE", "\n").replace("\n \n", "\n").lstrip("\n")
+        last_sentence = text[start:].replace("NEWLINE", "\n").replace("\n \n", "\n").strip()
         if last_sentence:
             sentences.append(last_sentence)
 

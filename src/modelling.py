@@ -1,13 +1,14 @@
 import spacy
 from spacy.matcher import Matcher
 
-def gt_mtchs(text, pattern, pattern_name, model='en_core_web_lg', verbose=True, context=2):
+def gt_mtchs(nlp, text, pattern, pattern_name, model='en_core_web_lg', verbose=True, context=2):
     """
     Returns the matches of a pattern in a text.
+
+    :param nlp: Pre-loaded SpaCy model.
     :param text: The input text as a string.
     :param pattern: List with dictionaries.
     :param pattern_name: Name to store the pattern in the matcher.
-    :param model: Pretrained spacy pipeline to use.
     :param verbose: If True, matches are printed.
     :param context: Number of tokens to include for the context of the match (both sides).
     :return: Set of matches.

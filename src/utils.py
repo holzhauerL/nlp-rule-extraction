@@ -6,17 +6,20 @@ import spacy
 
 def ld_spcy_mdl(model):
     """
-    Evaluating if the pretrained spaCy model is already installed, and installing it, if it itsn't. 
-    :param model: Name of the pretrained spacy model. 
+    Evaluating if the pre-trained SpaCy model is already installed, and installing it, if it isn't. 
+
+    :param model: Name of the pre-trained SpaCy  model. 
+    :return: Pre-trained SpaCy model.
     """
     try:
         # Try to load the spaCy model
-        spacy.load(model)
+        nlp = spacy.load(model)
         print('The model', model, 'is already installed!')
     except OSError:
         # If loading fails, install the model using subprocess
         print("Installing", model, "model...")
         subprocess.check_call([sys.executable, "-m", "spacy", "download", model])
+    return nlp
 
 # TODO: Generalize
 def docx_to_txt(docx_path='EB115.docx',txt_path='output.txt'):
