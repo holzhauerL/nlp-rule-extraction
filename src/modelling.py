@@ -23,7 +23,7 @@ class ConstraintSearcher:
         self.match_type = None
 
     @staticmethod
-    def not_digit_or_period_pattern():
+    def no_digit_or_period():
         """
         Generates a spaCy pattern that matches tokens which are not digits or periods. 
         This pattern is used to capture textual elements in a constraint expression.
@@ -177,7 +177,7 @@ class InequalityConstraintSearcher(ConstraintSearcher):
         patterns = {}
         for phrase in expanded_dict.keys():
             phrase_pattern = [{"LOWER": word} for word in phrase.split()]
-            phrase_pattern.extend(ConstraintSearcher.not_digit_or_period_pattern())
+            phrase_pattern.extend(ConstraintSearcher.no_digit_or_period())
             phrase_pattern.append({"LIKE_NUM": True})
             patterns[phrase] = phrase_pattern
         return patterns
