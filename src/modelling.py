@@ -19,7 +19,7 @@ class ConstraintSearcher:
         """
         self.nlp = nlp
         self.parameters = parameters
-        self.unique_matches = {'type': [], 'matches': [], 'patterns': [], 'exception': [], 'negation': [], 'symbol': []}
+        self.unique_matches = {'id': [], 'type': [], 'matches': [], 'patterns': [], 'exception': [], 'negation': [], 'symbol': []}
         self.match_type = None
 
     @staticmethod
@@ -99,13 +99,15 @@ class ConstraintSearcher:
         highlighted_text += text[last_index:]
         print(highlighted_text)
 
-    def search_matches(self, text, exception_patterns):
+    def search_matches(self, text, exception_patterns, id):
         """
         Searches for matches in the text based on defined patterns, considering exceptions.
 
         :param text: The text in which to search for matches.
         :param exception_patterns: A dictionary of patterns that should be treated as exceptions.
-        :return: A dictionary containing details of the unique matches found in the text.
+        :param id: The ID of the first match found by the current function within the document.
+        :return unique_matches: A dictionary containing details of the unique matches found in the text.
+        :return id: The ID of the last match + 1 found by the current function within the document.
         """
         # Merging general and exception patterns
         general_dict = self.expand_dict(self.parameters["general"])
@@ -142,11 +144,15 @@ class ConstraintSearcher:
                 is_exception = formatted_match_str in formatted_exception_patterns or \
                             formatted_match_str in {key.upper().replace(" ", "_") for key in exceptions_dict.keys()}
 
+                self.unique_matches['id'].append(id)
                 self.unique_matches['type'].append(self.match_type)
                 self.unique_matches['matches'].append((start, end))
                 self.unique_matches['patterns'].append(formatted_match_str)
                 self.unique_matches['exception'].append(is_exception)
                 self.unique_matches['negation'].append((is_negated, negated_token))
+
+                # Updating the ID
+                id += 1
 
                 # Handling symbols
                 phrase = match_str.replace("_", " ").lower()
@@ -156,7 +162,7 @@ class ConstraintSearcher:
                 self.unique_matches['symbol'].append(symbol)
                 seen_tokens.add(end)
 
-        return self.unique_matches
+        return self.unique_matches, id
 
     def create_patterns(self, expanded_dict):
         """
@@ -230,7 +236,7 @@ class EqualityConstraintSearcher(ConstraintSearcher):
         return patterns
 
 def search_constraints(nlp, text, equality_params, inequality_params, 
-inequality_exception_patterns, equality_exception_patterns):
+inequality_exception_patterns, equality_exception_patterns, id):
     """
     Conducts a combined search for both equality and inequality constraints within a given text.
 
@@ -242,28 +248,31 @@ inequality_exception_patterns, equality_exception_patterns):
     :param inequality_params: Parameters for the InequalityConstraintSearcher.
     :param inequality_exception_patterns: Exception patterns for the InequalityConstraintSearcher.
     :param equality_exception_patterns: Exception patterns for the EqualityConstraintSearcher.
-    :return: None. The function prints a tabulated summary of the combined constraint search results.
+    :param id: The ID of the first match found by the current function within the document.
+    :return id: The ID of the last match + 1 found by the current function within the document.
     """
     # Initialize searchers
     inequality_searcher = InequalityConstraintSearcher(nlp, inequality_params)
     equality_searcher = EqualityConstraintSearcher(nlp, equality_params)
 
-    # Perform the searches
-    inequality_match_details = inequality_searcher.search_matches(text, inequality_exception_patterns)
-    equality_match_details = equality_searcher.search_matches(text, equality_exception_patterns)
+    # Perform the searches for inequality matches and overwrite ID
+    inequality_match_details, id = inequality_searcher.search_matches(text, inequality_exception_patterns, id)
+    # Perform the searches for equality matches adn overwrite ID
+    equality_match_details, id = equality_searcher.search_matches(text, equality_exception_patterns, id)
 
-    # Combine matches and types
+    # Combine matches, types, negations
     combined_matches = inequality_match_details['matches'] + equality_match_details['matches']
     combined_match_types = [inequality_searcher.match_type] * len(inequality_match_details['matches']) + \
                            [equality_searcher.match_type] * len(equality_match_details['matches'])
     combined_negations = [negation[1] for negation in inequality_match_details['negation'] if negation[0]] + \
                          [negation[1] for negation in equality_match_details['negation'] if negation[0]]
 
-    # Highlighting Text
+    # Highlighting text
     ConstraintSearcher(nlp, equality_params).highlight_matches(text, combined_matches, combined_negations, combined_match_types)
 
-    # Combined Tabular Data
+    # Combined tabular data
     combined_table_data = zip(
+        inequality_match_details['id'] + equality_match_details['id'],
         combined_match_types,
         combined_matches,
         inequality_match_details['patterns'] + equality_match_details['patterns'],
@@ -271,4 +280,6 @@ inequality_exception_patterns, equality_exception_patterns):
         [neg[0] for neg in inequality_match_details['negation']] + [neg[0] for neg in equality_match_details['negation']],
         inequality_match_details['symbol'] + equality_match_details['symbol']
     )
-    print(tabulate(combined_table_data, headers=["Type", "Match", "Pattern", "Exception", "Negation", "Symbol"]))
+    print(tabulate(combined_table_data, headers=["ID", "Type", "Match", "Pattern", "Exception", "Negation", "Symbol"]))
+
+    return id
