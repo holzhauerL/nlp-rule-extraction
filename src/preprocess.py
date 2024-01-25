@@ -158,14 +158,6 @@ def lmtz_and_rmv_stpwrds(nlp ,text, verbose=False):
     
     return ' '.join(lemmatized_tokens)
 
-# Patterns for different enumeration items types
-enum_patterns = {
-    'number_in_parentheses': r"\(\d+\)",
-    'number_with_dot': r"\d+\.",
-    'alphabetical_in_parentheses': r"\([a-z]\)",
-    'roman_numeral_in_parentheses': r"\([ivxlcdm]+\)",
-}
-
 def determine_enum_type(sentence, enum_patterns):
     """
     Determines the type of enumeration in the sentence.
@@ -184,13 +176,53 @@ def determine_enum_type(sentence, enum_patterns):
 
     return None
 
+def get_enum_details(sentence_doc, enum_pattern):
+    """
+    Extracts detailed information about enumeration items in a sentence.
 
-def split_to_chunks(nlp, text, separators=['.','!'], exceptions=True, case=None):
+    :param sentence_doc: SpaCy Doc object of the sentence.
+    :param enum_pattern: Regular expression pattern for enumeration items.
+    :return: List of tuples with detailed information about each enumeration item.
+    """
+    enumeration_details = []
+    total_enum_item_counter = 0
+    level_enum_item_counter = {}
+    current_level = 0
+
+    for token in sentence_doc:
+        if re.match(enum_pattern, token.text):
+            total_enum_item_counter += 1
+            current_level += 1
+            level_enum_item_counter[current_level] = level_enum_item_counter.get(current_level, 0) + 1
+            start_token_number_enumerator = token.i
+
+            # Find the end of the enumeration item
+            end_token_number_enum_item = start_token_number_enumerator
+            for next_token in sentence_doc[start_token_number_enumerator + 1:]:
+                if re.match(enum_pattern, next_token.text):
+                    break
+                end_token_number_enum_item = next_token.i
+
+            enumeration_details.append((
+                enum_pattern,
+                current_level,
+                total_enum_item_counter,
+                level_enum_item_counter[current_level],
+                start_token_number_enumerator,
+                token.i,
+                end_token_number_enum_item
+            ))
+
+    return enumeration_details
+
+
+def split_to_chunks(nlp, text, enum_patterns, separators=['.','!'], exceptions=True, case=None):
     """
     Splits the input into an array of text chunks, which might be a sentence or a sequence of enuemration items.
 
     :param nlp: Pre-loaded SpaCy model.
     :param text: Input string.
+    :param enum_patterns: Dictionary of regular expressions serving as enumeration patterns.
     :param separators: Array where each token determines the separation of the sentences.
     :param exceptions: Determines if exceptions should be considered or not.
     :param case: The use case, for quality control.
@@ -203,6 +235,7 @@ def split_to_chunks(nlp, text, separators=['.','!'], exceptions=True, case=None)
     doc = nlp(text)
 
     sentences = []
+    enumerations = []
     start = 0
 
     for token in doc:
@@ -238,8 +271,8 @@ def split_to_chunks(nlp, text, separators=['.','!'], exceptions=True, case=None)
                     enum_type = determine_enum_type(sentence, enum_patterns)
 
                     if enum_type is not None:
-                        print("Enumeration found in:", case)
-                        print("Enum type:", enum_type)
+                        # print("Enumeration found in:", case)
+                        # print("Enum type:", enum_type)
                         # Enumeration case
                         end_of_enum = start
                         in_enumeration = True
@@ -259,8 +292,10 @@ def split_to_chunks(nlp, text, separators=['.','!'], exceptions=True, case=None)
 
                         sentence = text[start:end_of_enum]
                         start = end_of_enum + len(" NEWLINE ")
+                        enumerations.append()
                     else:
                         start = end + 1
+                        enumerations.append()
                     sentence = sentence.replace("NEWLINE", "\n").replace("\n \n", "\n").strip()
                     sentences.append(sentence)
 
@@ -270,4 +305,4 @@ def split_to_chunks(nlp, text, separators=['.','!'], exceptions=True, case=None)
         if last_sentence:
             sentences.append(last_sentence)
 
-    return sentences
+    return sentences, enumerations
