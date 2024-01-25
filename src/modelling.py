@@ -1,6 +1,7 @@
 from spacy.matcher import Matcher
 from termcolor import colored
 from tabulate import tabulate
+from collections import defaultdict
 
 class ConstraintSearcher:
     """
@@ -19,7 +20,7 @@ class ConstraintSearcher:
         """
         self.nlp = nlp
         self.parameters = parameters
-        self.unique_matches = {'id': [], 'type': [], 'matches': [], 'patterns': [], 'exception': [], 'negation': [], 'symbol': []}
+        self.unique_matches = {'id': [], 'type': [], 'match': [], 'patterns': [], 'exception': [], 'negation': [], 'symbol': [],  'predecessor': [], 'successor': []}
         self.match_type = None
 
     @staticmethod
@@ -146,10 +147,14 @@ class ConstraintSearcher:
 
                 self.unique_matches['id'].append(id)
                 self.unique_matches['type'].append(self.match_type)
-                self.unique_matches['matches'].append((start, end))
+                self.unique_matches['match'].append((start, end))
                 self.unique_matches['patterns'].append(formatted_match_str)
                 self.unique_matches['exception'].append(is_exception)
                 self.unique_matches['negation'].append((is_negated, negated_token))
+
+                connector_pre = 'START' if id == 1 else 'FOLLOW' # Indicate the start of the constraints
+                self.unique_matches['predecessor'].append((id-1,connector_pre))
+                self.unique_matches['successor'].append((id+1,'FOLLOW'))
 
                 # Updating the ID
                 id += 1
@@ -234,9 +239,39 @@ class EqualityConstraintSearcher(ConstraintSearcher):
             phrase_pattern = [{"LOWER": word} for word in phrase.split()]
             patterns[phrase.upper().replace(" ", "_")] = phrase_pattern
         return patterns
+    
+class MetaConstraintSearcher(ConstraintSearcher):
+    """
+    A subclass of ConstraintSearcher specifically designed for searching meta constraints in text.
+    Meta constraints encapsulate one or multiple constraints. 
+    """
+    def __init__(self, nlp, parameters):
+        """
+        Initializes the EqualityConstraintSearcher with the given NLP model and parameters.
+
+        :param nlp: An instance of a spaCy Language model used for processing text.
+        :param parameters: A dictionary containing settings and parameters for equality constraint searching.
+        """
+        super().__init__(nlp, parameters)
+        self.match_type = 'META'
+
+    def create_patterns(self, dict):
+        """
+        Creates patterns for meta constraints based on the dictionary.
+
+        This method generates spaCy patterns that are used to identify meta constraints, for example those triggered by enumeration or if-clauses.
+
+        :param dict: A dictionary with phrases.
+        :return: A dictionary of spaCy patterns for identifying equality constraints.
+        """
+        patterns = {}
+        for phrase in dict.keys():
+            phrase_pattern = [{"LOWER": word} for word in phrase.split()]
+            patterns[phrase.upper().replace(" ", "_")] = phrase_pattern
+        return patterns
 
 def search_constraints(nlp, text, equality_params, inequality_params, 
-inequality_exception_patterns, equality_exception_patterns, id):
+inequality_exception_patterns, equality_exception_patterns, id=1):
     """
     Conducts a combined search for both equality and inequality constraints within a given text.
 
@@ -249,6 +284,7 @@ inequality_exception_patterns, equality_exception_patterns, id):
     :param inequality_exception_patterns: Exception patterns for the InequalityConstraintSearcher.
     :param equality_exception_patterns: Exception patterns for the EqualityConstraintSearcher.
     :param id: The ID of the first match found by the current function within the document.
+    :return constraints: A dictionary with detailed information about the found constraints. 
     :return id: The ID of the last match + 1 found by the current function within the document.
     """
     # Initialize searchers
@@ -261,25 +297,78 @@ inequality_exception_patterns, equality_exception_patterns, id):
     equality_match_details, id = equality_searcher.search_matches(text, equality_exception_patterns, id)
 
     # Combine matches, types, negations
-    combined_matches = inequality_match_details['matches'] + equality_match_details['matches']
-    combined_match_types = [inequality_searcher.match_type] * len(inequality_match_details['matches']) + \
-                           [equality_searcher.match_type] * len(equality_match_details['matches'])
+    combined_matches = inequality_match_details['match'] + equality_match_details['match']
+    combined_match_types = [inequality_searcher.match_type] * len(inequality_match_details['match']) + \
+                           [equality_searcher.match_type] * len(equality_match_details['match'])
     combined_negations = [negation[1] for negation in inequality_match_details['negation'] if negation[0]] + \
                          [negation[1] for negation in equality_match_details['negation'] if negation[0]]
+
+    # Create output dict
+    constraints = {
+        'ID': inequality_match_details['id'] + equality_match_details['id'],
+        'Type': combined_match_types,
+        'Match': combined_matches,
+        'Pattern': inequality_match_details['patterns'] + equality_match_details['patterns'],
+        'Exception': inequality_match_details['exception'] + equality_match_details['exception'],
+        'Negation': [neg[0] for neg in inequality_match_details['negation']] + [neg[0] for neg in equality_match_details['negation']],
+        'Predecessor': inequality_match_details['predecessor'] + equality_match_details['predecessor'],
+        'Successor': inequality_match_details['successor'] + equality_match_details['successor'],
+    }
 
     # Highlighting text
     ConstraintSearcher(nlp, equality_params).highlight_matches(text, combined_matches, combined_negations, combined_match_types)
 
-    # Combined tabular data
-    combined_table_data = zip(
-        inequality_match_details['id'] + equality_match_details['id'],
-        combined_match_types,
-        combined_matches,
-        inequality_match_details['patterns'] + equality_match_details['patterns'],
-        inequality_match_details['exception'] + equality_match_details['exception'],
-        [neg[0] for neg in inequality_match_details['negation']] + [neg[0] for neg in equality_match_details['negation']],
-        inequality_match_details['symbol'] + equality_match_details['symbol']
-    )
-    print(tabulate(combined_table_data, headers=["ID", "Type", "Match", "Pattern", "Exception", "Negation", "Symbol"]))
+    # Print in tabular format
+    combined_table_data = zip(*constraints.values())
+    print(tabulate(combined_table_data, headers=constraints.keys()))
 
-    return id
+    return constraints, id
+
+def search_constraints_in_data(nlp, data, equality_params, inequality_params, 
+inequality_exception_patterns, equality_exception_patterns):
+    """
+    Conducts a combined search for both equality and inequality constraints for all use cases.
+
+    This function initializes both InequalityConstraintSearcher and EqualityConstraintSearcher, performs the search, and then combines their findings.
+
+    Wrapper function for search_constraints(). 
+
+    :param nlp: A spaCy Language model instance used for text processing.
+    :param data: A dictionary with one dataframe per use case containing pre-processed chunks of text in the 'Processed' column.  
+    :param equality_params: Parameters for the EqualityConstraintSearcher.
+    :param inequality_params: Parameters for the InequalityConstraintSearcher.
+    :param inequality_exception_patterns: Exception patterns for the InequalityConstraintSearcher.
+    :param equality_exception_patterns: Exception patterns for the EqualityConstraintSearcher.
+    :return constraints: A dictionary with detailed information about the found constraints. 
+    """
+    constraints_tmp = defaultdict(lambda: defaultdict(list)) # Enable dict assignment before knowing the keys
+
+    for use_case, df in data.items():
+        print("-"*40)
+        print("-"*40, "\n")
+        print(use_case.upper())
+        print("-"*40)
+        print("-"*40, "\n")
+
+        id = 1  # Initialize ID for each use case
+        for index, row in df.iterrows(): # Iterate over the rows in the dataframe
+            for chunk_index, chunk in enumerate(row['Processed']):  # Iterate over each chunk in the Processed column
+                print("\n###CHUNK###\n")
+                new_constraints, id = search_constraints(nlp, chunk, equality_params, inequality_params, 
+                                                            inequality_exception_patterns, equality_exception_patterns, id)
+                for key, values in new_constraints.items():
+                    constraints_tmp[use_case][key].extend(values)
+                    if key == 'ID':  # Only append to 'Index' and 'Chunk' when new 'ID' is found
+                        constraints_tmp[use_case]['Index'].extend([index] * len(values))
+                        constraints_tmp[use_case]['Chunk'].extend([chunk_index] * len(values))
+
+        # Overwrite the successor of the last found constraint item to demark the end, if any constraint was found
+        if constraints_tmp[use_case]['Successor']:
+            constraints_tmp[use_case]['Successor'][-1] = (constraints_tmp[use_case]['Successor'][-1][0],'END')
+
+    # Format to regular dict
+    constraints = dict()
+    for key, value in constraints_tmp.items():
+        constraints[key] = dict(value)
+
+    return constraints
