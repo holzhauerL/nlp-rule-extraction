@@ -107,19 +107,28 @@ class ConstraintSearcher:
         :param exception_patterns: A dictionary of patterns that should be treated as exceptions.
         :return: A dictionary containing details of the unique matches found in the text.
         """
-        expanded_dict = self.expand_dict(self.parameters["general"])
-        patterns = self.create_patterns(expanded_dict)
+        # Merging general and exception patterns
+        general_dict = self.expand_dict(self.parameters["general"])
+        exceptions_dict = {key: value for key, value in self.parameters["exceptions"].items()}
+        merged_dict = {**general_dict, **exceptions_dict}
+
+        # Creating patterns
+        patterns = self.create_patterns(merged_dict)
         formatted_exception_patterns = {key.upper().replace(" ", "_"): value for key, value in exception_patterns.items()}
         for key, value in formatted_exception_patterns.items():
             if callable(value):
                 patterns[key] = value()
             else:
                 patterns[key] = value
+
+        # Matching patterns
         matcher = Matcher(self.nlp.vocab)
         for key, pattern in patterns.items():
             matcher.add(key, [pattern])
         doc = self.nlp(text)
         matches = matcher(doc)
+
+        # Processing matches
         seen_tokens = set()
         for match_id, start, end in matches:
             if end not in seen_tokens:
@@ -127,18 +136,26 @@ class ConstraintSearcher:
                 formatted_match_str = match_str.upper().replace(" ", "_")
                 is_negated = self.check_for_negation(doc, start, self.parameters["negation_tokens"], self.parameters["window_size"])
                 negated_token = start - 1 if is_negated else None
-                is_exception = formatted_match_str in formatted_exception_patterns
+
+                # Determining if the match is an exception
+                # Check in formatted exception patterns and the keys of exceptions_dict after formatting them
+                is_exception = formatted_match_str in formatted_exception_patterns or \
+                            formatted_match_str in {key.upper().replace(" ", "_") for key in exceptions_dict.keys()}
+
                 self.unique_matches['type'].append(self.match_type)
                 self.unique_matches['matches'].append((start, end))
                 self.unique_matches['patterns'].append(formatted_match_str)
                 self.unique_matches['exception'].append(is_exception)
                 self.unique_matches['negation'].append((is_negated, negated_token))
+
+                # Handling symbols
                 phrase = match_str.replace("_", " ").lower()
-                symbol = expanded_dict.get(phrase, None)
+                symbol = merged_dict.get(phrase, None)
                 if symbol is not None and is_negated:
                     symbol = self.parameters["negation_operators"].get(symbol, symbol)
                 self.unique_matches['symbol'].append(symbol)
                 seen_tokens.add(end)
+
         return self.unique_matches
 
     def create_patterns(self, expanded_dict):
