@@ -255,101 +255,6 @@ class MetaConstraintSearcher(ConstraintSearcher):
         super().__init__(nlp, parameters)
         self.match_type = 'META'
 
-    def search_enumeration(self, text, id):
-        """
-        Searches for enumeration constraints in the text..
-
-        :param text: The text in which to search for matches.
-        :param id: The ID of the first match found by the current function within the document.
-        :return unique_matches: A dictionary containing details of the unique matches found in the text.
-        :return id: The ID of the last match + 1 found by the current function within the document.
-        """
-        pattern = [{"TEXT": ":"}, ]
-    
-    def search_matches(self, text, general_patterns, exception_patterns, id):
-        """
-        Searches for matches in the text based on defined patterns, considering exceptions.
-
-        :param text: The text in which to search for matches.
-        :param exception_patterns: A dictionary of patterns that should be treated as exceptions.
-        :param id: The ID of the first match found by the current function within the document.
-        :return unique_matches: A dictionary containing details of the unique matches found in the text.
-        :return id: The ID of the last match + 1 found by the current function within the document.
-        """
-        # Merging general and exception patterns
-        general_dict = self.parameters["general"]
-        exceptions_dict = {key: value for key, value in self.parameters["exceptions"].items()}
-        merged_dict = {**general_dict, **exceptions_dict}
-
-        # Creating patterns
-        patterns = self.create_patterns(merged_dict)
-        formatted_exception_patterns = {key.upper().replace(" ", "_"): value for key, value in exception_patterns.items()}
-        for key, value in formatted_exception_patterns.items():
-            if callable(value):
-                patterns[key] = value()
-            else:
-                patterns[key] = value
-
-        # Matching patterns
-        matcher = Matcher(self.nlp.vocab)
-        for key, pattern in patterns.items():
-            matcher.add(key, [pattern])
-        doc = self.nlp(text)
-        matches = matcher(doc)
-
-        # Processing matches
-        seen_tokens = set()
-        for match_id, start, end in matches:
-            if end not in seen_tokens:
-                match_str = self.nlp.vocab.strings[match_id]
-                formatted_match_str = match_str.upper().replace(" ", "_")
-                is_negated = self.check_for_negation(doc, start, self.parameters["negation_tokens"], self.parameters["window_size"])
-                negated_token = start - 1 if is_negated else None
-
-                # Determining if the match is an exception
-                # Check in formatted exception patterns and the keys of exceptions_dict after formatting them
-                is_exception = formatted_match_str in formatted_exception_patterns or \
-                            formatted_match_str in {key.upper().replace(" ", "_") for key in exceptions_dict.keys()}
-
-                self.unique_matches['id'].append(id)
-                self.unique_matches['type'].append(self.match_type)
-                self.unique_matches['match'].append((start, end))
-                self.unique_matches['patterns'].append(formatted_match_str)
-                self.unique_matches['exception'].append(is_exception)
-                self.unique_matches['negation'].append((is_negated, negated_token))
-
-                connector_pre = 'START' if id == 1 else 'FOLLOW' # Indicate the start of the constraints
-                self.unique_matches['predecessor'].append((id-1,connector_pre))
-                self.unique_matches['successor'].append((id+1,'FOLLOW'))
-
-                # Updating the ID
-                id += 1
-
-                # Handling symbols
-                phrase = match_str.replace("_", " ").lower()
-                symbol = merged_dict.get(phrase, None)
-                if symbol is not None and is_negated:
-                    symbol = self.parameters["negation_operators"].get(symbol, symbol)
-                self.unique_matches['symbol'].append(symbol)
-                seen_tokens.add(end)
-
-        return self.unique_matches, id
-
-    def create_patterns(self, dict):
-        """
-        Creates patterns for meta constraints based on the dictionary.
-
-        This method generates spaCy patterns that are used to identify meta constraints, for example those triggered by enumeration or if-clauses.
-
-        :param dict: A dictionary with phrases.
-        :return: A dictionary of spaCy patterns for identifying equality constraints.
-        """
-        patterns = {}
-        for phrase in dict.keys():
-            phrase_pattern = [{"LOWER": word} for word in phrase.split()]
-            patterns[phrase.upper().replace(" ", "_")] = phrase_pattern
-        return patterns
-
 def search_constraints(nlp, text, equality_params, inequality_params, 
 inequality_exception_patterns, equality_exception_patterns, id=1):
     """
@@ -414,7 +319,7 @@ inequality_exception_patterns, equality_exception_patterns):
     Wrapper function for search_constraints(). 
 
     :param nlp: A spaCy Language model instance used for text processing.
-    :param data: A dictionary with one dataframe per use case containing pre-processed chunks of text in the 'Processed' column.  
+    :param data: A dictionary with one dataframe per use case containing pre-processed chunks of text in the 'Lemma' column.  
     :param equality_params: Parameters for the EqualityConstraintSearcher.
     :param inequality_params: Parameters for the InequalityConstraintSearcher.
     :param inequality_exception_patterns: Exception patterns for the InequalityConstraintSearcher.
@@ -432,7 +337,7 @@ inequality_exception_patterns, equality_exception_patterns):
 
         id = 1  # Initialize ID for each use case
         for index, row in df.iterrows(): # Iterate over the rows in the dataframe
-            for chunk_index, chunk in enumerate(row['Processed']):  # Iterate over each chunk in the Processed column
+            for chunk_index, chunk in enumerate(row['Lemma']):  # Iterate over each chunk in the Lemma column
                 print("\n###CHUNK###\n")
                 new_constraints, id = search_constraints(nlp, chunk, equality_params, inequality_params, 
                                                             inequality_exception_patterns, equality_exception_patterns, id)
