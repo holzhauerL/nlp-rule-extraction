@@ -55,11 +55,11 @@ c11 = ({go to roasting chamber 3}, {go to roasting chamber 4}, {directly follows
 
 c12 = ({go to roasting chamber 4}, {retrieve final product}, {directly follows}, {roasting_degree == medium AND height < 170 AND t4 <= 550})
 
-c13 = ({go to roasting chamber 1}, {go to roasting chamber 2}, {directly follows}, {roasting_degree == medium AND height >= 170 AND 460 < t1 < 180})
+c13 = ({go to roasting chamber 1}, {go to roasting chamber 2}, {directly follows}, {roasting_degree == medium AND height >= 170 AND 180 <= t1 <= 460})
 
-c14 = ({go to roasting chamber 2}, {go to roasting chamber 3}, {directly follows}, {roasting_degree == medium AND height >= 170 AND 570 < t2 < 290})
+c14 = ({go to roasting chamber 2}, {go to roasting chamber 3}, {directly follows}, {roasting_degree == medium AND height >= 170 AND 290 <= t1 <= 570})
 
-c15 = ({go to roasting chamber 3}, {go to roasting chamber 4}, {directly follows}, {roasting_degree == medium AND height >= 170 AND 670 < t3 < 390})
+c15 = ({go to roasting chamber 3}, {go to roasting chamber 4}, {directly follows}, {roasting_degree == medium AND height >= 170 AND 390 <= t1 <= 670})
 
 c16 = ({go to roasting chamber 4}, {retrieve final product}, {directly follows}, {roasting_degree == medium AND height >= 170 AND t4 <= 560})
 

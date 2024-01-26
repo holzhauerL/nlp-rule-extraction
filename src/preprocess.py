@@ -4,6 +4,7 @@ import pickle
 from termcolor import colored
 import pandas as pd
 import spacy
+from spacy.matcher import Matcher
 from spacy.lang.en.stop_words import STOP_WORDS
 import numerizer
 
@@ -42,15 +43,16 @@ def txt_to_df(file_path, section_start="# ", subsection_start="## "):
 
             columns[-1][1].append(line)
     
-    data = {"Section": [], "Raw": [], "Processed": []}
+    data = {"Section": [], "Raw": [], "Processed": [], "Enumerations": []}
     for column_name, column_content in columns:
         data["Section"].append(column_name)
         data["Raw"].append('\n'.join(column_content))
         data["Processed"].append('')
+        data["Enumerations"].append('')
 
     return pd.DataFrame(data)
 
-def rmv_and_rplc(text, remove=["\n", "\t"], replace={"->": "leads to", "-->": "leads to"}, space=True):
+def rmv_and_rplc(text, replace, remove, space=True):
     """
     Removes and replaces literals in the text. 
 
@@ -122,6 +124,32 @@ def chng_stpwrds(nlp, add=[],remove=[],remove_numbers=False,restore_default=Fals
             print(word)
     return stpwrds
 
+def make_aligned_doc(nlp, text):
+    """
+    Create a doc and an alignement to the orignal text. Needed for enumeration items, since there a linebreak is relevant for matching but messes with the spacy tagger.
+    
+    :param nlp: Pre-loaded SpaCy model.
+    :param text: Text input from which stop words are removed and which is lemmatized.
+    :return doc: Processed doc object.
+    :return alignment: Dictionary with the mapping of the indices from new to old.
+    """
+    #Replace all whitespace with spaces here
+    doc = nlp(text.replace("\n", " "))
+    alignment = {} # new mapping to old
+    ii = 0 # index in new doc
+
+    for tok in doc:
+        if tok.is_space:
+            continue
+        
+        alignment[ii] = tok.idx
+        ii += len(tok.text_with_ws)
+
+    text = [tok.text_with_ws for tok in doc if not tok.is_space]
+    text = ''.join(text)
+
+    return nlp(text), alignment
+
 def lmtz_and_rmv_stpwrds(nlp ,text, verbose=False):
     """
     Remove stop words and lemmatize text. 
@@ -176,62 +204,62 @@ def determine_enum_type(sentence, enum_patterns):
 
     return None
 
-def get_enum_details(sentence_doc, enum_pattern):
+def get_enum_details(sentence, enum_patterns):
     """
     Extracts detailed information about enumeration items in a sentence.
 
-    :param sentence_doc: SpaCy Doc object of the sentence.
-    :param enum_pattern: Regular expression pattern for enumeration items.
+    :param sentence: Input string.
+    :param enum_patterns: Dictionary of regular expressions serving as enumeration patterns.
     :return: List of tuples with detailed information about each enumeration item.
     """
     enumeration_details = []
     total_enum_item_counter = 0
     level_enum_item_counter = {}
     current_level = 0
+    last_enum_end = 0
 
-    for token in sentence_doc:
-        if re.match(enum_pattern, token.text):
+    # Find all matches for enumeration patterns in the sentence
+    for pattern_name, pattern in enum_patterns.items():
+        for match in re.finditer(pattern, sentence):
             total_enum_item_counter += 1
             current_level += 1
             level_enum_item_counter[current_level] = level_enum_item_counter.get(current_level, 0) + 1
-            start_token_number_enumerator = token.i
 
-            # Find the end of the enumeration item
-            end_token_number_enum_item = start_token_number_enumerator
-            for next_token in sentence_doc[start_token_number_enumerator + 1:]:
-                if re.match(enum_pattern, next_token.text):
-                    break
-                end_token_number_enum_item = next_token.i
+            start_char_number_enumerator = match.start()
+            end_char_number_enumerator = match.end() - 1
+            last_enum_end = max(last_enum_end, end_char_number_enumerator)
+
+            # Set end_char_number_enum_item to the start of the next match - 1, or end of sentence
+            next_match = next(re.finditer(pattern, sentence[end_char_number_enumerator+1:]), None)
+            if next_match:
+                end_char_number_enum_item = next_match.start() + end_char_number_enumerator
+            else:
+                end_char_number_enum_item = len(sentence) - 1
 
             enumeration_details.append((
-                enum_pattern,
+                pattern_name,
                 current_level,
                 total_enum_item_counter,
                 level_enum_item_counter[current_level],
-                start_token_number_enumerator,
-                token.i,
-                end_token_number_enum_item
+                start_char_number_enumerator,
+                end_char_number_enumerator,
+                end_char_number_enum_item
             ))
 
     return enumeration_details
 
-
-def split_to_chunks(nlp, text, enum_patterns, separators=['.','!'], exceptions=True, case=None):
+def split_to_chunks(nlp, text, enum_patterns, linebreak, separators=['.','!'], exceptions=True):
     """
     Splits the input into an array of text chunks, which might be a sentence or a sequence of enuemration items.
 
     :param nlp: Pre-loaded SpaCy model.
     :param text: Input string.
     :param enum_patterns: Dictionary of regular expressions serving as enumeration patterns.
+    :param linebreak: The symbol to replace "\n".
     :param separators: Array where each token determines the separation of the sentences.
     :param exceptions: Determines if exceptions should be considered or not.
-    :param case: The use case, for quality control.
     :return: Array of sentences.
     """
-    # Replace and handle line breaks and spaces
-    text = text.replace("\n\n", "\n").replace("\n \n", "\n")
-    text = text.replace("\n", " NEWLINE ").replace("   ", " ").replace("  ", " ")
-
     doc = nlp(text)
 
     sentences = []
@@ -260,7 +288,7 @@ def split_to_chunks(nlp, text, enum_patterns, separators=['.','!'], exceptions=T
                     # multiple sequential separators, for example: "...";
                     or (len(sentence) > 0 and sentence[-1] in separators) 
                     # an enumeration item (assuming it starts at a new line), for example "\n1.";
-                    or (prev_prev_token and prev_prev_token.text == "NEWLINE") 
+                    or (prev_prev_token and prev_prev_token.text == linebreak) 
                     # "i.e.";
                     or (prev_token and prev_token.text.lower() == "i" and next_token and next_token.text.lower() == "e") 
                     # special methodology name for CDM use case.
@@ -273,17 +301,16 @@ def split_to_chunks(nlp, text, enum_patterns, separators=['.','!'], exceptions=T
                     if enum_type is not None:
                         # print("Enumeration found in:", case)
                         # print("Enum type:", enum_type)
-                        # Enumeration case
                         end_of_enum = start
                         in_enumeration = True
                         while in_enumeration:
                             next_period = text.find(".", end_of_enum + 1)
-                            next_newline = text.find(" NEWLINE ", next_period)
+                            next_newline = text.find(linebreak, next_period)
                             if next_period == -1 or next_newline == -1:
                                 end_of_enum = len(text)
                                 break
                             
-                            next_part = text[next_newline:].lstrip(" NEWLINE ")
+                            next_part = text[next_newline:].lstrip(linebreak)
                             if not re.match(enum_patterns[enum_type], next_part):
                                 end_of_enum = next_newline
                                 in_enumeration = False
@@ -291,17 +318,17 @@ def split_to_chunks(nlp, text, enum_patterns, separators=['.','!'], exceptions=T
                                 end_of_enum = next_newline
 
                         sentence = text[start:end_of_enum]
-                        start = end_of_enum + len(" NEWLINE ")
-                        enumerations.append()
+                        start = end_of_enum + len(linebreak)
                     else:
                         start = end + 1
-                        enumerations.append()
-                    sentence = sentence.replace("NEWLINE", "\n").replace("\n \n", "\n").strip()
+                    sentence = sentence.strip()
+                    enumeration_summary = get_enum_details(sentence, enum_patterns)
+                    enumerations.append(enumeration_summary)
                     sentences.append(sentence)
 
     # Add the last sentence if there is any text left
     if start < len(text):
-        last_sentence = text[start:].replace("NEWLINE", "\n").replace("\n \n", "\n").strip()
+        last_sentence = text[start:].strip()
         if last_sentence:
             sentences.append(last_sentence)
 
