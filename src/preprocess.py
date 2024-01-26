@@ -4,7 +4,6 @@ import pickle
 from termcolor import colored
 import pandas as pd
 import spacy
-from spacy.matcher import Matcher
 from spacy.lang.en.stop_words import STOP_WORDS
 import numerizer
 
@@ -16,7 +15,7 @@ def txt_to_df(file_path, section_start="# ", subsection_start="## "):
     :param file_path: Relative path to the .txt input file.
     :param section_start: String indicating the start of a section title.
     :param subsection_start: String indicating the start of a subsection title.
-    :return: Dataframe with the columns "Section", "Raw" and "Processed" as well as {current_section}/{current_subsection} as a syntax for concatinating sections and sub-sections. 
+    :return: Dataframe with the columns "Section", "Raw", "Chunks, "Lemma", "Alignment" and "Linebreak" as well as {current_section}/{current_subsection} as a syntax for concatinating sections and sub-sections. 
     """
     raw = open(file_path).read()
 
@@ -43,22 +42,24 @@ def txt_to_df(file_path, section_start="# ", subsection_start="## "):
 
             columns[-1][1].append(line)
     
-    data = {"Section": [], "Raw": [], "Processed": [], "Enumerations": []}
+    data = {"Section": [], "Raw": [], "Chunks": [], "Lemma": [], "Alignment": [],"Linebreak": []}
     for column_name, column_content in columns:
         data["Section"].append(column_name)
         data["Raw"].append('\n'.join(column_content))
-        data["Processed"].append('')
-        data["Enumerations"].append('')
+        data["Chunks"].append('')
+        data["Lemma"].append('')
+        data["Alignment"].append('')
+        data["Linebreak"].append('')
 
     return pd.DataFrame(data)
 
-def rmv_and_rplc(text, replace, remove, space=True):
+def rplc_and_rmv(text, replace, remove, space=True):
     """
-    Removes and replaces literals in the text. 
+    Replaces and removes literals in the text. 
 
     :param text: Input string.
-    :param remove: List of strings to remove.
     :param replace: Mapping of strings to replace.
+    :param remove: List of strings to remove.
     :param space: Flag to choose if a space should be used for the replacements.
     :return: Output string with replacements and removals. 
     """
@@ -124,45 +125,46 @@ def chng_stpwrds(nlp, add=[],remove=[],remove_numbers=False,restore_default=Fals
             print(word)
     return stpwrds
 
-def make_aligned_doc(nlp, text):
+def lmtz_and_rmv_stpwrds(nlp, text, verbose=False):
     """
-    Create a doc and an alignement to the orignal text. Needed for enumeration items, since there a linebreak is relevant for matching but messes with the spacy tagger.
-    
-    :param nlp: Pre-loaded SpaCy model.
-    :param text: Text input from which stop words are removed and which is lemmatized.
-    :return doc: Processed doc object.
-    :return alignment: Dictionary with the mapping of the indices from new to old.
-    """
-    #Replace all whitespace with spaces here
-    doc = nlp(text.replace("\n", " "))
-    alignment = {} # new mapping to old
-    ii = 0 # index in new doc
-
-    for tok in doc:
-        if tok.is_space:
-            continue
-        
-        alignment[ii] = tok.idx
-        ii += len(tok.text_with_ws)
-
-    text = [tok.text_with_ws for tok in doc if not tok.is_space]
-    text = ''.join(text)
-
-    return nlp(text), alignment
-
-def lmtz_and_rmv_stpwrds(nlp ,text, verbose=False):
-    """
-    Remove stop words and lemmatize text. 
+    Remove stop words and lemmatize text. This function also tracks if the token was originally followed by a line break.
+    Parts of the code taken from https://github.com/explosion/spaCy/issues/7735. 
 
     :param nlp: Pre-loaded SpaCy model.
     :param text: Text input from which stop words are removed and which is lemmatized.
     :param verbose: If True, removed stop words are printed.
-    :return: Processed text.
+    :return: Processed text, alignment mapping (output to input), and line break status.
     """
-    doc = nlp(text)
     stpwrds = set(nlp.Defaults.stop_words)
-    
-    lemmatized_tokens = [token.lemma_ for token in doc if token.lemma_ not in stpwrds]
+    alignment = {}  # Mapping output to input
+    output_tokens = []
+    suc_linebreaks = []  # List to keep track of line breaks
+    output_length = 0  # Cumulative length of the output string
+    input_index_offset = 0  # Offset to track index in original text
+
+    lines = text.split('\n')
+    for line in lines:
+        doc = nlp(line)
+        for tok in doc:
+            if tok.is_space or tok.lemma_ in stpwrds:
+                continue
+
+            output_tokens.append(tok.lemma_)  # Add the lemmatized token
+            # Calculate the start index of this token in the output string
+            start_idx_output = output_length
+            # Update the output length (including a space for separation)
+            output_length += len(tok.lemma_) + 1
+            # Map the start index in the output to the start index in the input
+            alignment[start_idx_output] = tok.idx + input_index_offset
+
+            suc_linebreaks.append(False)
+
+        # Update the input index offset for the next line
+        input_index_offset += len(line) + 1
+
+        # Add a line break marker at the end of each line except the last
+        if line != lines[-1]:
+            suc_linebreaks[-1] = True
     
     if verbose:
         sentences = [sent.text for sent in doc.sents]
@@ -173,7 +175,7 @@ def lmtz_and_rmv_stpwrds(nlp ,text, verbose=False):
             
             for token in nlp(sentence):
                 if token.text.isalpha():  # Exclude non-alphabetic tokens
-                    if token.lemma_ not in lemmatized_tokens:
+                    if token.lemma_ not in output_tokens:
                         highlighted_text += colored(token.text, 'red') + ' '
                     else:
                         highlighted_text += token.text + ' '
@@ -184,7 +186,8 @@ def lmtz_and_rmv_stpwrds(nlp ,text, verbose=False):
             print(lemma_sentence)
             print('')
     
-    return ' '.join(lemmatized_tokens)
+    output = ' '.join(output_tokens)
+    return output, alignment, suc_linebreaks
 
 def determine_enum_type(sentence, enum_patterns):
     """
@@ -204,60 +207,57 @@ def determine_enum_type(sentence, enum_patterns):
 
     return None
 
-def get_enum_details(sentence, enum_patterns):
+def get_enum_details(sentence_doc, enum_pattern):
     """
     Extracts detailed information about enumeration items in a sentence.
 
-    :param sentence: Input string.
-    :param enum_patterns: Dictionary of regular expressions serving as enumeration patterns.
+    :param sentence_doc: SpaCy Doc object of the sentence.
+    :param enum_pattern: Regular expression pattern for enumeration items.
     :return: List of tuples with detailed information about each enumeration item.
     """
     enumeration_details = []
     total_enum_item_counter = 0
     level_enum_item_counter = {}
     current_level = 0
-    last_enum_end = 0
 
-    # Find all matches for enumeration patterns in the sentence
-    for pattern_name, pattern in enum_patterns.items():
-        for match in re.finditer(pattern, sentence):
+    for token in sentence_doc:
+        if re.match(enum_pattern, token.text):
             total_enum_item_counter += 1
             current_level += 1
             level_enum_item_counter[current_level] = level_enum_item_counter.get(current_level, 0) + 1
+            start_token_number_enumerator = token.i
 
-            start_char_number_enumerator = match.start()
-            end_char_number_enumerator = match.end() - 1
-            last_enum_end = max(last_enum_end, end_char_number_enumerator)
-
-            # Set end_char_number_enum_item to the start of the next match - 1, or end of sentence
-            next_match = next(re.finditer(pattern, sentence[end_char_number_enumerator+1:]), None)
-            if next_match:
-                end_char_number_enum_item = next_match.start() + end_char_number_enumerator
-            else:
-                end_char_number_enum_item = len(sentence) - 1
+            # Find the end of the enumeration item
+            end_token_number_enum_item = start_token_number_enumerator
+            for next_token in sentence_doc[start_token_number_enumerator + 1:]:
+                if re.match(enum_pattern, next_token.text):
+                    break
+                end_token_number_enum_item = next_token.i
 
             enumeration_details.append((
-                pattern_name,
+                enum_pattern,
                 current_level,
                 total_enum_item_counter,
                 level_enum_item_counter[current_level],
-                start_char_number_enumerator,
-                end_char_number_enumerator,
-                end_char_number_enum_item
+                start_token_number_enumerator,
+                token.i,
+                end_token_number_enum_item
             ))
 
     return enumeration_details
 
-def split_to_chunks(nlp, text, enum_patterns, linebreak, separators=['.','!'], exceptions=True):
+
+def split_to_chunks(nlp, text, enum_patterns, linebreak, separators=['.','!'], exceptions=True, case=None):
     """
     Splits the input into an array of text chunks, which might be a sentence or a sequence of enuemration items.
 
     :param nlp: Pre-loaded SpaCy model.
     :param text: Input string.
     :param enum_patterns: Dictionary of regular expressions serving as enumeration patterns.
-    :param linebreak: The symbol to replace "\n".
+    :param linebreak: The character replacing a linebreak to split into chunks.
     :param separators: Array where each token determines the separation of the sentences.
     :param exceptions: Determines if exceptions should be considered or not.
+    :param case: The use case, for quality control.
     :return: Array of sentences.
     """
     doc = nlp(text)
@@ -288,7 +288,7 @@ def split_to_chunks(nlp, text, enum_patterns, linebreak, separators=['.','!'], e
                     # multiple sequential separators, for example: "...";
                     or (len(sentence) > 0 and sentence[-1] in separators) 
                     # an enumeration item (assuming it starts at a new line), for example "\n1.";
-                    or (prev_prev_token and prev_prev_token.text == linebreak) 
+                    or (prev_prev_token and prev_prev_token.text == linebreak.strip()) 
                     # "i.e.";
                     or (prev_token and prev_token.text.lower() == "i" and next_token and next_token.text.lower() == "e") 
                     # special methodology name for CDM use case.
@@ -301,6 +301,7 @@ def split_to_chunks(nlp, text, enum_patterns, linebreak, separators=['.','!'], e
                     if enum_type is not None:
                         # print("Enumeration found in:", case)
                         # print("Enum type:", enum_type)
+                        # Enumeration case
                         end_of_enum = start
                         in_enumeration = True
                         while in_enumeration:
@@ -321,15 +322,13 @@ def split_to_chunks(nlp, text, enum_patterns, linebreak, separators=['.','!'], e
                         start = end_of_enum + len(linebreak)
                     else:
                         start = end + 1
-                    sentence = sentence.strip()
-                    enumeration_summary = get_enum_details(sentence, enum_patterns)
-                    enumerations.append(enumeration_summary)
+                    sentence = sentence.replace(linebreak.strip(), "\n").strip()
                     sentences.append(sentence)
 
     # Add the last sentence if there is any text left
     if start < len(text):
-        last_sentence = text[start:].strip()
+        last_sentence = text[start:].replace(linebreak.strip(), "\n").strip()
         if last_sentence:
             sentences.append(last_sentence)
 
-    return sentences, enumerations
+    return sentences
