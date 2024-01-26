@@ -191,17 +191,18 @@ def lmtz_and_rmv_stpwrds(nlp, text, verbose=False):
     output = ' '.join(output_tokens)
     return output, alignment, suc_linebreaks
 
-def determine_enum_type(sentence, enum_patterns):
+def determine_enum_type(sentence, enum_patterns, linebreak):
     """
     Determines the type of enumeration in the sentence.
 
     :param sentence: The sentence to check.
     :param enum_patterns: Dictionary of regular expressions serving as enumeration patterns.
+    :param linebreak: The string replacing a line break.
     :return: Name of the enumeration pattern if found, None otherwise.
     """
     for pattern_name, pattern in enum_patterns.items():
         # Construct regex for current pattern
-        combined_pattern = r"(: NEWLINE " + pattern + r")"
+        combined_pattern = rf"(:{linebreak}" + pattern + r")"
 
         # Check if the pattern matches
         if re.search(combined_pattern, sentence, re.IGNORECASE):
@@ -292,7 +293,7 @@ def split_to_chunks(nlp, text, enum_patterns, linebreak, separators=['.','!'], e
     :param nlp: Pre-loaded SpaCy model.
     :param text: Input string.
     :param enum_patterns: Dictionary of regular expressions serving as enumeration patterns.
-    :param linebreak: The character replacing a linebreak to split into chunks.
+    :param linebreak: The string replacing a line break to split into chunks.
     :param separators: Array where each token determines the separation of the sentences.
     :param exceptions: Determines if exceptions should be considered or not.
     :param case: The use case, for quality control.
@@ -334,7 +335,7 @@ def split_to_chunks(nlp, text, enum_patterns, linebreak, separators=['.','!'], e
                 )
 
                 if not is_exception:
-                    enum_type = determine_enum_type(sentence, enum_patterns)
+                    enum_type = determine_enum_type(sentence, enum_patterns, linebreak)
 
                     if enum_type is not None:
                         end_of_enum = start
