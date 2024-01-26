@@ -68,38 +68,6 @@ class ConstraintSearcher:
                 return True
         return False
 
-    # def highlight_matches(self, text, matches, negations, match_type):
-    #     """
-    #     Highlights the matches in the text based on their types and negations. 
-    #     It uses different colors for different types of matches and negations.
-
-    #     :param text: The original text in which matches are to be highlighted.
-    #     :param matches: A list of match tuples (start_index, end_index).
-    #     :param negations: A list of indices where negations occur.
-    #     :param match_type: A list of types corresponding to each match.
-    #     :return: None. The function prints the highlighted text.
-    #     """
-    #     doc = self.nlp(text)
-    #     highlighted_text = ""
-    #     last_index = 0
-    #     combined = [(start, end, 'match', mtype) for (start, end), mtype in zip(matches, match_type)]
-    #     combined.extend([(negation, negation + 1, 'negation', None) for negation in negations])
-    #     combined.sort(key=lambda x: x[0])
-    #     for start, end, type, mtype in combined:
-    #         start_char = doc[start].idx
-    #         end_char = doc[end - 1].idx + len(doc[end - 1].text)
-    #         highlighted_text += text[last_index:start_char]
-    #         if type == 'match' and mtype == 'INEQ':
-    #             color = 'green' 
-    #         elif type == 'match':
-    #             color = 'blue'
-    #         else:
-    #             color = 'red'
-    #         highlighted_text += colored(text[start_char:end_char], color, attrs=['bold'])
-    #         last_index = end_char
-    #     highlighted_text += text[last_index:]
-    #     print(highlighted_text)
-
     def highlight_matches(self, text, matches, negations, match_types):
         """
         Highlights the matches in the text based on their types and negations. 
