@@ -302,7 +302,6 @@ def split_to_chunks(nlp, text, enum_patterns, linebreak, separators=['.','!'], e
     doc = nlp(text)
 
     sentences = []
-    enumerations = []
     start = 0
 
     for token in doc:
