@@ -61,12 +61,12 @@ class ConstraintSearcher:
         :param start_index: The index of the token in the Doc from where to start checking for negation.
         :param negation_tokens: A list of tokens considered as negations.
         :param window_size: A tuple indicating the window size (pre-index, post-index) to check for negation.
-        :return: Boolean indicating whether a negation token is found within the specified window.
+        :return: Token which triggered the negation and boolean indicating whether a negation token is found within the specified window.
         """
         for i in range(max(0, start_index - window_size[0]), min(len(doc), start_index + window_size[1])):
             if doc[i].lower_ in negation_tokens:
-                return True
-        return False
+                return doc[i].i, True
+        return None, False
 
     def highlight_matches(self, text, matches, negations, match_types):
         """
@@ -83,6 +83,9 @@ class ConstraintSearcher:
         highlighted_text = ""
         last_index = 0
         combined = []
+
+        # Remove duplicates
+        negations = list(set(negations))
 
         for match, mtype in zip(matches, match_types):
             if mtype != 'META':
@@ -157,8 +160,7 @@ class ConstraintSearcher:
             if end not in seen_tokens:
                 match_str = self.nlp.vocab.strings[match_id]
                 formatted_match_str = match_str.upper().replace(" ", "_")
-                is_negated = self.check_for_negation(doc, start, self.parameters["negation_tokens"], self.parameters["window_size"])
-                negated_token = start - 1 if is_negated else None
+                negated_token, is_negated = self.check_for_negation(doc, start, self.parameters["negation_tokens"], self.parameters["window_size"])
 
                 # Determining if the match is an exception
                 # Check in formatted exception patterns and the keys of exceptions_dict after formatting them
@@ -285,9 +287,12 @@ class MetaConstraintSearcher(ConstraintSearcher):
         :param id: The ID of the first meta constraint found by the current function within the document.
         :return: A dictionary containing details of the meta constraints found in the text.
         """
-        first_enum_item = True
-        logical_connection = 'AND'
-        exception = False
+        logical_connections = {}
+        exceptions = {}
+        pattern_names = {}
+        last_level = 0
+        levels_covered = []
+
         doc = self.nlp(text)
 
         # Create the patterns for the exceptions
@@ -296,9 +301,15 @@ class MetaConstraintSearcher(ConstraintSearcher):
             phrase_pattern = [{"LOWER": word} for word in phrase.split()]
             patterns[phrase.upper().replace(" ", "_")] = phrase_pattern
 
-
         for enum in enumeration_summary:
             level, start_token_enumeration, end_token_enumeration, end_token_item = enum[1], enum[-3], enum[-2], enum[-1]
+
+            if last_level != level and level not in levels_covered:
+                first_enum_item = True
+                logical_connections[level] = 'AND'
+                exceptions[level] = False
+                pattern_names[level] = 'DEFAULT'
+                levels_covered.append(level)
 
             # Determine the logical connection for the enumeration (AND/OR), only for the first enumeration item
             if first_enum_item:
@@ -309,39 +320,38 @@ class MetaConstraintSearcher(ConstraintSearcher):
                 matches = matcher(doc[:start_token_enumeration])
 
                 if doc[end_token_item].lower_ == 'or':
-                    logical_connection = 'OR'
-                    exception = True
-                    pattern = "OR"
+                    logical_connections[level] = 'OR'
+                    exceptions[level] = True
+                    pattern_names[level] = 'OR'
                 elif len(matches):
                     match = matches[-1] # only considering the last match
                     match_str = self.nlp.vocab.strings[match[0]]
                     formatted_match_str = match_str.lower().replace("_"," ")
-                    logical_connection = self.parameters['enum_exceptions'][formatted_match_str]
-                    exception = True
-                    pattern = match_str
+                    logical_connections[level] = self.parameters['enum_exceptions'][formatted_match_str]
+                    exceptions[level] = True
+                    pattern_names[level] = match_str
 
                 first_enum_item = False
-            
-            if not exception:
-                pattern = 'DEFAULT'
 
             # Filling in the details for the meta constraint
             self.unique_matches['id'].append(id)
             self.unique_matches['type'].append('ENUM')
             self.unique_matches['match'].append(((start_token_enumeration, end_token_enumeration),end_token_item))
-            self.unique_matches['patterns'].append(pattern)
-            self.unique_matches['exception'].append(exception)
+            self.unique_matches['patterns'].append(pattern_names[level])
+            self.unique_matches['exception'].append(exceptions[level])
             self.unique_matches['negation'].append('')
             self.unique_matches['symbol'].append('')
             self.unique_matches['level'].append(level)
 
             # Set predecessor and successor
-            connector_pre = 'START' if id == 1 else logical_connection
-            connector_suc = logical_connection
+            connector_pre = 'START' if id == 1 else logical_connections[level]
+            connector_suc = logical_connections[level]
             self.unique_matches['predecessor'].append((id-1, connector_pre))
             self.unique_matches['successor'].append((id+1, connector_suc))
 
             id += 1
+
+            last_level = level
 
         return self.unique_matches, id
 
@@ -397,9 +407,10 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
     combined_match_types = [inequality_searcher.match_type] * len(inequality_match_details['match']) + \
                            [equality_searcher.match_type] * len(equality_match_details['match']) + \
                            [meta_searcher.match_type] * len(enum_match_details['match'])
+    # For visualisation
     combined_negations = [negation[1] for negation in inequality_match_details['negation'] if negation[0]] + \
                          [negation[1] for negation in equality_match_details['negation'] if negation[0]] + \
-                         [False] * len(enum_match_details['match'])  # Meta constraints don't have negations
+                         [] * len(enum_match_details['match']) 
 
     # Create output dict
     constraints = {
@@ -408,7 +419,7 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
         'Match': combined_matches,
         'Pattern': inequality_match_details['patterns'] + equality_match_details['patterns'] + enum_match_details['patterns'],
         'Exception': inequality_match_details['exception'] + equality_match_details['exception'] + enum_match_details['exception'],
-        'Negation': [neg[0] for neg in inequality_match_details['negation']] + [neg[0] for neg in equality_match_details['negation']] + [False] * len(enum_match_details['match']),
+        'Negation': inequality_match_details['negation'] + equality_match_details['negation'] + [''] * len(enum_match_details['match']),
         'Symbol': inequality_match_details['symbol'] + equality_match_details['symbol'] + enum_match_details['symbol'],
         'Level': inequality_match_details['level'] + equality_match_details['level'] + enum_match_details['level'],
         'Predecessor': inequality_match_details['predecessor'] + equality_match_details['predecessor'] + enum_match_details['predecessor'],

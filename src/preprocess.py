@@ -280,6 +280,10 @@ def get_enum_details(nlp, lemmatized_chunk, succeding_linebreaks, enum_patterns_
             while enum_stack and enum_stack[-1][0] != enum_type:
                 enum_stack.pop()
 
+    # Ensure that an enumeration has at least two items, otherwise it is not considered an enumeration
+    if len(summary) <= 1:
+        summary = []
+
     # Update the end token number for the last enumeration item
     if summary:
         summary[-1] = summary[-1][:6] + (len(doc) - 1,)
