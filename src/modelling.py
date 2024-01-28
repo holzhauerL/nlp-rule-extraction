@@ -22,16 +22,7 @@ class ConstraintSearcher:
         self.parameters = parameters
         self.constraints = {'id': [], 'type': [], 'match': [], 'patterns': [], 'exception': [], 'negation': [], 'symbol': [],  'level': [], 'predecessor': [], 'successor': []}
         self.type = None
-
-    @staticmethod
-    def no_digit_or_period():
-        """
-        Generates a spaCy pattern that matches tokens which are not digits or periods. 
-        This pattern is used to capture textual elements in a constraint expression.
-
-        :return: A list of dictionaries representing the spaCy pattern for matching non-digit and non-period tokens.
-        """
-        return [{"TEXT": {"NOT_IN": ["."]}, "IS_DIGIT": False, "OP": "*"}]
+        self.empty = "NA"
 
     def expand_dict(self, input_dict):
         """
@@ -68,7 +59,7 @@ class ConstraintSearcher:
                 return doc[i].i, True
         return None, False
 
-    def highlight_matches(self, text, matches, negations, types):
+    def highlight_matches(self, text, matches, negations, match_types):
         """
         Highlights the matches in the text based on their types and negations. 
         Uses different colors for different types of matches and negations. 
@@ -77,7 +68,7 @@ class ConstraintSearcher:
         :param text: The original text in which matches are to be highlighted.
         :param matches: A list of match tuples (start_index, end_index) or ((start_index, end_index), token_index) for 'META' type.
         :param negations: A list of indices where negations occur.
-        :param type: A list of types corresponding to each match.
+        :param match_types: A list of types corresponding to each match.
         :return: None. The function prints the highlighted text.
         """
         doc = self.nlp(text)
@@ -86,10 +77,10 @@ class ConstraintSearcher:
         combined = []
         highlighted_indices = set()  # Set to keep track of highlighted tokens
 
-        # Remove duplicates
-        negations = list(set(negations))
+        # Remove duplicates and None elements
+        negations = [n for n in set(negations) if n is not None]
 
-        for match, mtype in zip(matches, types):
+        for match, mtype in zip(matches, match_types):
             if mtype != 'META':
                 combined.append((match[0], match[1], 'match', mtype))
             else:
@@ -97,8 +88,10 @@ class ConstraintSearcher:
                 if isinstance(match[0], tuple):  # ((start, end_enum), end)
                     range_match, single_token = match
                     combined.append((range_match[0], range_match[1], 'match', mtype))
+                    combined.append((match[1], match[1] + 1, 'match', mtype))
                 else:  # (start, end)
-                    combined.append((match[0], match[1], 'match', mtype))
+                    combined.append((match[0], match[0] + 1, 'match', mtype))
+                    combined.append((match[1], match[1] + 1, 'match', mtype))
 
         combined.extend([(negation, negation + 1, 'negation', None) for negation in negations])
         combined.sort(key=lambda x: x[0])
@@ -181,7 +174,7 @@ class ConstraintSearcher:
                 self.constraints['patterns'].append(formatted_match_str)
                 self.constraints['exception'].append(is_exception)
                 self.constraints['negation'].append((negated_token, is_negated))
-                self.constraints['level'].append('') # Only relevant for enumeration constraints
+                self.constraints['level'].append(self.empty) # Only relevant for enumeration constraints
 
                 connector_pre = 'START' if id == 1 else 'FOLLOW' # Indicate the start of the constraints
                 self.constraints['predecessor'].append((id-1,connector_pre))
@@ -195,6 +188,8 @@ class ConstraintSearcher:
                 symbol = merged_dict.get(phrase, None)
                 if symbol is not None and is_negated:
                     symbol = self.parameters["negation_operators"].get(symbol, symbol)
+                elif symbol is None:
+                    symbol = self.empty
                 self.constraints['symbol'].append(symbol)
                 seen_tokens.add(end)
 
@@ -236,8 +231,7 @@ class InequalityConstraintSearcher(ConstraintSearcher):
         patterns = {}
         for phrase in expanded_dict.keys():
             phrase_pattern = [{"LOWER": word} for word in phrase.split()]
-            phrase_pattern.extend(ConstraintSearcher.no_digit_or_period())
-            phrase_pattern.append({"LIKE_NUM": True})
+            phrase_pattern.extend([{"TEXT": {"NOT_IN": [".", ","]}, "IS_DIGIT": False, "OP": "*"},{"LIKE_NUM": True}])
             patterns[phrase] = phrase_pattern
         return patterns
 
@@ -347,8 +341,8 @@ class MetaConstraintSearcher(ConstraintSearcher):
             self.constraints['match'].append(((start_token_enumeration, end_token_enumeration),end_token_item))
             self.constraints['patterns'].append(pattern_names[level])
             self.constraints['exception'].append(exceptions[level])
-            self.constraints['negation'].append('')
-            self.constraints['symbol'].append('')
+            self.constraints['negation'].append(self.empty)
+            self.constraints['symbol'].append(self.empty)
             self.constraints['level'].append(level)
 
             # Set predecessor and successor
@@ -390,11 +384,12 @@ class MetaConstraintSearcher(ConstraintSearcher):
             if not succeeding_linebreaks[start:end].count(True):  # Ensure match is within a single line
                 # Extend the match end to the last comma or 'then'
                 extended_end = end
-                for i in range(end, len(doc)):
+                for i in range(end, start, -1):
                     if doc[i].lower_ == ',' or doc[i].lower_ == 'then':
-                        extended_end = i + 1
-                    if succeeding_linebreaks[i]:
-                        break  # Stop at line break
+                        extended_end = i
+                        break
+                
+                negated_token, is_negated = self.check_for_negation(doc, start, self.parameters["negation_tokens"], self.parameters["window_size"])
 
                 if start not in processed_matches or (extended_end - start) > (processed_matches[start][1] - processed_matches[start][0]):
                     processed_matches[start] = (start, extended_end)
@@ -405,9 +400,9 @@ class MetaConstraintSearcher(ConstraintSearcher):
             self.constraints['match'].append((start, end))
             self.constraints['patterns'].append(self.nlp.vocab.strings[match_id].upper())
             self.constraints['exception'].append(False)
-            self.constraints['negation'].append('')
-            self.constraints['symbol'].append('')
-            self.constraints['level'].append('')
+            self.constraints['negation'].append((negated_token, is_negated))
+            self.constraints['symbol'].append(self.empty)
+            self.constraints['level'].append(self.empty)
 
             connector_pre = 'START' if id == 1 else 'AND'
             self.constraints['predecessor'].append((id-1, connector_pre))
@@ -451,6 +446,8 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
     equality = EqualityConstraintSearcher(nlp, equality_params)
     meta = MetaConstraintSearcher(nlp, meta_params)
 
+    searchers = [inequality, equality, meta]
+
     # Perform the searches and combine match details
     id = inequality.search_matches(text, id)
     id = equality.search_matches(text, id)
@@ -458,9 +455,9 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
     id = meta.search_if_clauses(text, linebreaks, id)
 
     # Combine matches, types, negations for visualisation
-    combined_negations = [neg[0] for neg in inequality.constraints['negation'] if neg[1]] + \
-                         [neg[0] for neg in equality.constraints['negation'] if neg[1]] + \
-                         [] * (len(meta.constraints['match']))
+    combined_negations = []
+    for s in searchers:
+        combined_negations.extend(neg[0] for neg in s.constraints['negation'] if isinstance(neg,tuple))
 
     # Create output dict
     constraints = {}
