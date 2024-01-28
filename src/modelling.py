@@ -20,9 +20,41 @@ class ConstraintSearcher:
         """
         self.nlp = nlp
         self.parameters = parameters
-        self.constraints = {'id': [], 'type': [], 'match': [], 'patterns': [], 'exception': [], 'negation': [], 'symbol': [],  'level': [], 'predecessor': [], 'successor': []}
+        self.constraints = {'id': [], 'type': [], 'match': [], 'pattern': [], 'exception': [], 'negation': [], 'symbol': [],  'level': [], 'predecessor': [], 'successor': []}
         self.type = None
         self.empty = "NA"
+        self.con_follow = "FOLLOW"
+        self.con_start = "START"
+        self.con_end = "END"
+        self.con_and = "AND"
+        self.con_or = "OR"
+
+    def _add_constraint(self, id, match=None, pattern=None, exception=None, negation=None, symbol=None, level=None, connector_pre=None, connector_suc=None):
+        """
+        Adds a new constraint to the constraints dictionary.
+
+        Each parameter corresponds to a different attribute of a constraint. The method updates the constraints dictionary by appending the provided attribute values to the respective lists.
+
+        :param type: The type of the constraint.
+        :param match: The spaCy match.
+        :param pattern: Name of the matching pattern.
+        :param exception: Indicates if it is an exception.
+        :param negation: Indicates if there is a negation in the constraint.
+        :param symbol: Symbol representing the constraint.
+        :param level: The level of an enumeration constraint.
+        :param connector_pre: The connection of the predecessor to the constraint.
+        :param connector_suc: The connection of the successor to the constraint.
+        """
+        self.constraints['id'].append(id)
+        self.constraints['type'].append(self.type)
+        self.constraints['match'].append(match if match is not None else self.empty)
+        self.constraints['pattern'].append(pattern if pattern is not None else self.empty)
+        self.constraints['exception'].append(exception if exception is not None else self.empty)
+        self.constraints['negation'].append(negation if negation is not None else self.empty)
+        self.constraints['symbol'].append(symbol if symbol is not None else self.empty)
+        self.constraints['level'].append(level if level is not None else self.empty)
+        self.constraints['predecessor'].append((id-1, connector_pre))
+        self.constraints['successor'].append((id+1, connector_suc))
 
     def expand_dict(self, input_dict):
         """
@@ -168,30 +200,22 @@ class ConstraintSearcher:
                 is_exception = formatted_match_str in formatted_exception_patterns or \
                             formatted_match_str in {key.upper().replace(" ", "_") for key in exceptions_dict.keys()}
 
-                self.constraints['id'].append(id)
-                self.constraints['type'].append(self.type)
-                self.constraints['match'].append((start, end))
-                self.constraints['patterns'].append(formatted_match_str)
-                self.constraints['exception'].append(is_exception)
-                self.constraints['negation'].append((negated_token, is_negated))
-                self.constraints['level'].append(self.empty) # Only relevant for enumeration constraints
-
-                connector_pre = 'START' if id == 1 else 'FOLLOW' # Indicate the start of the constraints
-                self.constraints['predecessor'].append((id-1,connector_pre))
-                self.constraints['successor'].append((id+1,'FOLLOW'))
-
-                # Updating the ID
-                id += 1
+                # Indicate the start of the constraints
+                connector_pre = self.con_start if id == 1 else self.con_follow
 
                 # Handling symbols
                 phrase = match_str.replace("_", " ").lower()
                 symbol = merged_dict.get(phrase, None)
                 if symbol is not None and is_negated:
                     symbol = self.parameters["negation_operators"].get(symbol, symbol)
-                elif symbol is None:
-                    symbol = self.empty
-                self.constraints['symbol'].append(symbol)
+        
                 seen_tokens.add(end)
+
+                # Add constraint
+                self._add_constraint(id, match=(start, end), pattern=formatted_match_str, exception=is_exception, negation=(negated_token, is_negated), symbol=symbol, connector_pre=connector_pre, connector_suc=self.con_follow)
+
+                # Updating the ID
+                id += 1
 
         return id
 
@@ -308,7 +332,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
 
             if last_level != level and level not in levels_covered:
                 first_enum_item = True
-                logical_connections[level] = 'AND'
+                logical_connections[level] = self.con_and
                 exceptions[level] = False
                 pattern_names[level] = 'ENUM'
                 levels_covered.append(level)
@@ -322,7 +346,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
                 matches = matcher(doc[:start_token_enumeration])
 
                 if doc[end_token_item].lower_ == 'or':
-                    logical_connections[level] = 'OR'
+                    logical_connections[level] = self.con_or
                     exceptions[level] = True
                     pattern_names[level] = 'ENUM_OR'
                 elif len(matches):
@@ -334,22 +358,14 @@ class MetaConstraintSearcher(ConstraintSearcher):
                     pattern_names[level] = 'ENUM_' + match_str
 
                 first_enum_item = False
-
-            # Filling in the details for the meta constraint
-            self.constraints['id'].append(id)
-            self.constraints['type'].append(self.type)
-            self.constraints['match'].append(((start_token_enumeration, end_token_enumeration),end_token_item))
-            self.constraints['patterns'].append(pattern_names[level])
-            self.constraints['exception'].append(exceptions[level])
-            self.constraints['negation'].append(self.empty)
-            self.constraints['symbol'].append(self.empty)
-            self.constraints['level'].append(level)
+            
 
             # Set predecessor and successor
-            connector_pre = 'START' if id == 1 else logical_connections[level]
+            connector_pre = self.con_start if id == 1 else logical_connections[level]
             connector_suc = logical_connections[level]
-            self.constraints['predecessor'].append((id-1, connector_pre))
-            self.constraints['successor'].append((id+1, connector_suc))
+
+            # Add constraint
+            self._add_constraint(id, match=((start_token_enumeration, end_token_enumeration),end_token_item), pattern=pattern_names[level], exception=exceptions[level], level=level, connector_pre=connector_pre, connector_suc=connector_suc)
 
             id += 1
 
@@ -361,7 +377,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
         """
         Searches for 'if' clauses within a single line of text and records their details.
 
-        This method uses spaCy pattern matching to identify 'if-then' or 'if-comma' structures within the text. 
+        This method uses spaCy pattern matching to identify 'if' structures within the text. 
         If multiple matches start with the same 'if' token, the longest match is selected. The search is limited 
         to single lines, considering linebreaks in the text.
 
@@ -395,25 +411,27 @@ class MetaConstraintSearcher(ConstraintSearcher):
                     processed_matches[start] = (start, extended_end)
 
         for start, (start, end) in processed_matches.items():
-            self.constraints['id'].append(id)
-            self.constraints['type'].append(self.type)
-            self.constraints['match'].append((start, end))
-            self.constraints['patterns'].append(self.nlp.vocab.strings[match_id].upper())
-            self.constraints['exception'].append(False)
-            self.constraints['negation'].append((negated_token, is_negated))
-            self.constraints['symbol'].append(self.empty)
-            self.constraints['level'].append(self.empty)
 
-            connector_pre = 'START' if id == 1 else 'AND'
-            self.constraints['predecessor'].append((id-1, connector_pre))
-            self.constraints['successor'].append((id+1, 'AND'))
+            connector_pre = self.con_start if id == 1 else self.con_and
+
+            # Add constraint
+            self._add_constraint(id, match=(start, end), pattern=self.nlp.vocab.strings[match_id].upper(), exception=False, negation=(negated_token, is_negated),connector_pre=connector_pre, connector_suc=self.con_and)
 
             id += 1
 
         return id
 
-    def search_for_clauses(self):
-        # Placeholder for 'search for clauses'
+    def search_for_clauses(self, text, succeeding_linebreaks, id):
+        """
+        Searches for 'for' clauses within a single line of text and records their details.
+
+        :param text: The text in which to search for 'if' clauses.
+        :param succeeding_linebreaks: A list indicating linebreaks in the text.
+        :param id: The ID to start with for the first 'if' clause found.
+        :return: The updated ID.
+        """
+
+        
         pass
 
     def search_connectors(self):
@@ -508,13 +526,13 @@ def search_constraints_in_data(nlp, data, equality_params, inequality_params, me
                 new_constraints, id = search_constraints(nlp, chunk, equality_params, inequality_params, meta_params, row['Enumeration'][chunk_index], row['Linebreak'][chunk_index], id)
                 for key, values in new_constraints.items():
                     constraints_tmp[use_case][key].extend(values)
-                    if key == 'ID':  # Only append to 'Index' and 'Chunk' when new 'ID' is found
-                        constraints_tmp[use_case]['Index'].extend([index] * len(values))
-                        constraints_tmp[use_case]['Chunk'].extend([chunk_index] * len(values))
+                    if key == 'id':  # Only append to 'index' and 'chunk' when new 'id' is found
+                        constraints_tmp[use_case]['index'].extend([index] * len(values))
+                        constraints_tmp[use_case]['chunk'].extend([chunk_index] * len(values))
 
         # Overwrite the successor of the last found constraint item to demark the end, if any constraint was found
-        if constraints_tmp[use_case]['Successor']:
-            constraints_tmp[use_case]['Successor'][-1] = (constraints_tmp[use_case]['Successor'][-1][0],'END')
+        if constraints_tmp[use_case]['successor']:
+            constraints_tmp[use_case]['successor'][-1] = (constraints_tmp[use_case]['successor'][-1][0],'END')
 
     # Format to regular dict
     constraints = dict()
