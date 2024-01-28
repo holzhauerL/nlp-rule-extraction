@@ -7,9 +7,6 @@ class ConstraintSearcher:
     """
     Base class for searching specific constraint patterns in text using spaCy's Matcher. 
     Provides a framework to define and search for patterns related to constraints like inequalities or equalities.
-
-    :param nlp: An instance of a spaCy Language model used for processing text.
-    :param parameters: A dictionary containing various settings and parameters for constraint searching.
     """
     def __init__(self, nlp, parameters):
         """
@@ -425,14 +422,35 @@ class MetaConstraintSearcher(ConstraintSearcher):
         """
         Searches for 'for' clauses within a single line of text and records their details.
 
-        :param text: The text in which to search for 'if' clauses.
+        :param text: The text in which to search for 'for' clauses.
         :param succeeding_linebreaks: A list indicating linebreaks in the text.
-        :param id: The ID to start with for the first 'if' clause found.
+        :param id: The ID to start with for the first 'for' clause found.
         :return: The updated ID.
         """
+        doc = self.nlp(text)
+        matcher = Matcher(self.nlp.vocab)
+        for pattern_name, pattern_func in self.parameters['for_patterns'].items():
+            matcher.add(pattern_name, [pattern_func()])
 
-        
-        pass
+        matches = matcher(doc)
+        processed_matches = {}
+
+        for match_id, start, end in matches:
+            if not succeeding_linebreaks[start:end].count(True):  # Ensure match is within a single lines
+
+                if start not in processed_matches or (end - start) > (processed_matches[start][1] - processed_matches[start][0]):
+                    processed_matches[start] = (start, end)
+
+        for start, (start, end) in processed_matches.items():
+
+            connector_pre = self.con_start if id == 1 else self.con_and
+
+            # Add constraint
+            self._add_constraint(id, match=(start, end), pattern=self.nlp.vocab.strings[match_id].upper(), exception=False,connector_pre=connector_pre, connector_suc=self.con_and)
+
+            id += 1
+
+        return id
 
     def search_connectors(self):
         # Placeholder for 'search connectors'
@@ -442,7 +460,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
         # Placeholder for 'rank constraints'
         pass
 
-def search_constraints(nlp, text, equality_params, inequality_params, meta_params, enumeration_summary, linebreaks, id=1):
+def search_constraints(nlp, text, equality_params, inequality_params, meta_params, enumeration_summary, linebreaks, id=1, verbose=True):
     """
     Conducts a combined search for equality, inequality, and meta (enumeration) constraints within a given text.
 
@@ -456,6 +474,7 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
     :param enumeration_summary: Enumeration summaries for meta constraint searching.
     :param linebreaks: Information on succeding line breaks for meta constraint searching.
     :param id: The ID of the first match found by the current function within the document.
+    :param verbose: Parameter to control the printed output. If True, output is printed.
     :return constraints: A dictionary with detailed information about the found constraints. 
     :return id: The ID of the last match + 1 found by the current function within the document.
     """
@@ -483,18 +502,19 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
         constraints[key] = inequality.constraints[key] + equality.constraints[key] + meta.constraints[key]
 
     # Highlighting text
-    ConstraintSearcher(nlp, equality_params).highlight_matches(text, constraints['match'], combined_negations, constraints['type'])
+    if verbose:
+        ConstraintSearcher(nlp, equality_params).highlight_matches(text, constraints['match'], combined_negations, constraints['type'])
 
     # Print in tabular format
     combined_table_data = zip(*constraints.values()) 
     # Only print if any of the lists in constraints has elements
-    if any(constraints.values()): 
+    if any(constraints.values()) and verbose: 
         print()
         print(tabulate(combined_table_data, headers=constraints.keys()))
 
     return constraints, id
 
-def search_constraints_in_data(nlp, data, equality_params, inequality_params, meta_params):
+def search_constraints_in_data(nlp, data, equality_params, inequality_params, meta_params, verbose=True):
     """
     Conducts a combined search for inequality, equality and meta constraints for all use cases.
 
@@ -505,25 +525,29 @@ def search_constraints_in_data(nlp, data, equality_params, inequality_params, me
     :param equality_params: Parameters for the EqualityConstraintSearcher.
     :param inequality_params: Parameters for the InequalityConstraintSearcher.
     :param meta_params: Parameters for the MetaConstraintSearcher.
+    :param verbose: Parameter to control the printed output. If True, output is printed.
     :return constraints: A dictionary with detailed information about the found constraints. 
     """
     delimiter_line = "+"*80
     constraints_tmp = defaultdict(lambda: defaultdict(list)) # Enable dict assignment before knowing the keys
 
     for use_case, df in data.items():
-        print()
-        print(delimiter_line)
-        print(delimiter_line, "\n")
-        print(use_case.upper(), "\n")
-        print(delimiter_line)
-        print(delimiter_line, "\n")
+        if verbose:
+            print()
+            print(delimiter_line)
+            print(delimiter_line, "\n")
+            print(use_case.upper(), "\n")
+            print(delimiter_line)
+            print(delimiter_line, "\n")
 
         id = 1  # Initialize ID for each use case
         for index, row in df.iterrows(): # Iterate over the rows in the dataframe
             for chunk_index, chunk in enumerate(row['Lemma']):  # Iterate over each chunk in the Lemma column
-                print()
-                print("++++ CHUNK ++++", "\n")
-                new_constraints, id = search_constraints(nlp, chunk, equality_params, inequality_params, meta_params, row['Enumeration'][chunk_index], row['Linebreak'][chunk_index], id)
+                if verbose:
+                    print()
+                    print("++++ CHUNK ++++", "\n")
+
+                new_constraints, id = search_constraints(nlp, chunk, equality_params, inequality_params, meta_params, row['Enumeration'][chunk_index], row['Linebreak'][chunk_index], id, verbose)
                 for key, values in new_constraints.items():
                     constraints_tmp[use_case][key].extend(values)
                     if key == 'id':  # Only append to 'index' and 'chunk' when new 'id' is found
