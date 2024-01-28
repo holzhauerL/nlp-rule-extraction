@@ -20,8 +20,8 @@ class ConstraintSearcher:
         """
         self.nlp = nlp
         self.parameters = parameters
-        self.unique_matches = {'id': [], 'type': [], 'match': [], 'patterns': [], 'exception': [], 'negation': [], 'symbol': [],  'level': [], 'predecessor': [], 'successor': []}
-        self.match_type = None
+        self.constraints = {'id': [], 'type': [], 'match': [], 'patterns': [], 'exception': [], 'negation': [], 'symbol': [],  'level': [], 'predecessor': [], 'successor': []}
+        self.type = None
 
     @staticmethod
     def no_digit_or_period():
@@ -68,43 +68,51 @@ class ConstraintSearcher:
                 return doc[i].i, True
         return None, False
 
-    def highlight_matches(self, text, matches, negations, match_types):
+    def highlight_matches(self, text, matches, negations, types):
         """
         Highlights the matches in the text based on their types and negations. 
-        It uses different colors for different types of matches and negations.
+        Uses different colors for different types of matches and negations. 
+        Ensures that a token is highlighted only once.
 
         :param text: The original text in which matches are to be highlighted.
         :param matches: A list of match tuples (start_index, end_index) or ((start_index, end_index), token_index) for 'META' type.
         :param negations: A list of indices where negations occur.
-        :param match_types: A list of types corresponding to each match.
+        :param type: A list of types corresponding to each match.
         :return: None. The function prints the highlighted text.
         """
         doc = self.nlp(text)
         highlighted_text = ""
         last_index = 0
         combined = []
+        highlighted_indices = set()  # Set to keep track of highlighted tokens
 
         # Remove duplicates
         negations = list(set(negations))
 
-        for match, mtype in zip(matches, match_types):
+        for match, mtype in zip(matches, types):
             if mtype != 'META':
                 combined.append((match[0], match[1], 'match', mtype))
             else:
-                # Unpack the META match tuples
-                range_match, single_token = match
-                combined.append((range_match[0], range_match[1], 'match', mtype))
-                combined.append((single_token, single_token + 1, 'match', mtype))
+                # Handle the structure of the META match
+                if isinstance(match[0], tuple):  # ((start, end_enum), end)
+                    range_match, single_token = match
+                    combined.append((range_match[0], range_match[1], 'match', mtype))
+                else:  # (start, end)
+                    combined.append((match[0], match[1], 'match', mtype))
 
         combined.extend([(negation, negation + 1, 'negation', None) for negation in negations])
         combined.sort(key=lambda x: x[0])
 
         for start, end, type, mtype in combined:
+            if start in highlighted_indices:
+                continue  # Skip if start index is already highlighted
+
             start_char = doc[start].idx
             end_char = doc[end - 1].idx + len(doc[end - 1].text)
             highlighted_text += text[last_index:start_char]
 
             # Determine color based on type and match type
+            color = 'magenta'  # Default color for other types
             if type == 'match':
                 if mtype == 'INEQ':
                     color = 'green'
@@ -112,13 +120,15 @@ class ConstraintSearcher:
                     color = 'blue'
                 elif mtype == 'META':
                     color = 'yellow'
-                else:
-                    color = 'magenta'  # Default color for other types
-            else:
+            elif type == 'negation':
                 color = 'red'
 
             highlighted_text += colored(text[start_char:end_char], color, attrs=['bold'])
             last_index = end_char
+
+            # Update highlighted indices
+            for i in range(start, end):
+                highlighted_indices.add(i)
 
         highlighted_text += text[last_index:]
         print(highlighted_text)
@@ -129,7 +139,6 @@ class ConstraintSearcher:
 
         :param text: The text in which to search for matches.
         :param id: The ID of the first match found by the current function within the document.
-        :return unique_matches: A dictionary containing details of the unique matches found in the text.
         :return id: The ID of the last match + 1 found by the current function within the document.
         """
         # Merging general and exception patterns
@@ -166,17 +175,17 @@ class ConstraintSearcher:
                 is_exception = formatted_match_str in formatted_exception_patterns or \
                             formatted_match_str in {key.upper().replace(" ", "_") for key in exceptions_dict.keys()}
 
-                self.unique_matches['id'].append(id)
-                self.unique_matches['type'].append(self.match_type)
-                self.unique_matches['match'].append((start, end))
-                self.unique_matches['patterns'].append(formatted_match_str)
-                self.unique_matches['exception'].append(is_exception)
-                self.unique_matches['negation'].append((is_negated, negated_token))
-                self.unique_matches['level'].append('') # Only relevant for enumeration constraints
+                self.constraints['id'].append(id)
+                self.constraints['type'].append(self.type)
+                self.constraints['match'].append((start, end))
+                self.constraints['patterns'].append(formatted_match_str)
+                self.constraints['exception'].append(is_exception)
+                self.constraints['negation'].append((negated_token, is_negated))
+                self.constraints['level'].append('') # Only relevant for enumeration constraints
 
                 connector_pre = 'START' if id == 1 else 'FOLLOW' # Indicate the start of the constraints
-                self.unique_matches['predecessor'].append((id-1,connector_pre))
-                self.unique_matches['successor'].append((id+1,'FOLLOW'))
+                self.constraints['predecessor'].append((id-1,connector_pre))
+                self.constraints['successor'].append((id+1,'FOLLOW'))
 
                 # Updating the ID
                 id += 1
@@ -186,10 +195,10 @@ class ConstraintSearcher:
                 symbol = merged_dict.get(phrase, None)
                 if symbol is not None and is_negated:
                     symbol = self.parameters["negation_operators"].get(symbol, symbol)
-                self.unique_matches['symbol'].append(symbol)
+                self.constraints['symbol'].append(symbol)
                 seen_tokens.add(end)
 
-        return self.unique_matches, id
+        return id
 
     def create_patterns(self, expanded_dict):
         """
@@ -213,7 +222,7 @@ class InequalityConstraintSearcher(ConstraintSearcher):
         :param parameters: A dictionary containing settings and parameters for inequality constraint searching.
         """
         super().__init__(nlp, parameters)
-        self.match_type = 'INEQ'
+        self.type = 'INEQ'
 
     def create_patterns(self, expanded_dict):
         """
@@ -245,7 +254,7 @@ class EqualityConstraintSearcher(ConstraintSearcher):
         :param parameters: A dictionary containing settings and parameters for equality constraint searching.
         """
         super().__init__(nlp, parameters)
-        self.match_type = 'EQ'
+        self.type = 'EQ'
 
     def create_patterns(self, expanded_dict):
         """
@@ -275,7 +284,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
         :param parameters: A dictionary containing settings and parameters for meta constraint searching.
         """
         super().__init__(nlp, parameters)
-        self.match_type = 'META'
+        self.type = 'META'
 
     def search_enum_constraints(self, text, enumeration_summary, id):
         """
@@ -284,7 +293,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
         :param text: The text in which to search for matches.
         :param enumeration_summary: A tuple containing enumeration details from the dataframe.
         :param id: The ID of the first meta constraint found by the current function within the document.
-        :return: A dictionary containing details of the meta constraints found in the text.
+        :return: The updated ID.
         """
         logical_connections = {}
         exceptions = {}
@@ -307,7 +316,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
                 first_enum_item = True
                 logical_connections[level] = 'AND'
                 exceptions[level] = False
-                pattern_names[level] = 'DEFAULT'
+                pattern_names[level] = 'ENUM'
                 levels_covered.append(level)
 
             # Determine the logical connection for the enumeration (AND/OR), only for the first enumeration item
@@ -321,43 +330,92 @@ class MetaConstraintSearcher(ConstraintSearcher):
                 if doc[end_token_item].lower_ == 'or':
                     logical_connections[level] = 'OR'
                     exceptions[level] = True
-                    pattern_names[level] = 'OR'
+                    pattern_names[level] = 'ENUM_OR'
                 elif len(matches):
                     match = matches[-1] # only considering the last match
                     match_str = self.nlp.vocab.strings[match[0]]
                     formatted_match_str = match_str.lower().replace("_"," ")
                     logical_connections[level] = self.parameters['enum_exceptions'][formatted_match_str]
                     exceptions[level] = True
-                    pattern_names[level] = match_str
+                    pattern_names[level] = 'ENUM_' + match_str
 
                 first_enum_item = False
 
             # Filling in the details for the meta constraint
-            self.unique_matches['id'].append(id)
-            self.unique_matches['type'].append('ENUM')
-            self.unique_matches['match'].append(((start_token_enumeration, end_token_enumeration),end_token_item))
-            self.unique_matches['patterns'].append(pattern_names[level])
-            self.unique_matches['exception'].append(exceptions[level])
-            self.unique_matches['negation'].append('')
-            self.unique_matches['symbol'].append('')
-            self.unique_matches['level'].append(level)
+            self.constraints['id'].append(id)
+            self.constraints['type'].append(self.type)
+            self.constraints['match'].append(((start_token_enumeration, end_token_enumeration),end_token_item))
+            self.constraints['patterns'].append(pattern_names[level])
+            self.constraints['exception'].append(exceptions[level])
+            self.constraints['negation'].append('')
+            self.constraints['symbol'].append('')
+            self.constraints['level'].append(level)
 
             # Set predecessor and successor
             connector_pre = 'START' if id == 1 else logical_connections[level]
             connector_suc = logical_connections[level]
-            self.unique_matches['predecessor'].append((id-1, connector_pre))
-            self.unique_matches['successor'].append((id+1, connector_suc))
+            self.constraints['predecessor'].append((id-1, connector_pre))
+            self.constraints['successor'].append((id+1, connector_suc))
 
             id += 1
 
             last_level = level
 
-        return self.unique_matches, id
+        return id
 
-    # Placeholder for the remaining functions
-    def search_if_clauses(self):
-        # Placeholder for 'search if clauses'
-        pass
+    def search_if_clauses(self, text, succeeding_linebreaks, id):
+        """
+        Searches for 'if' clauses within a single line of text and records their details.
+
+        This method uses spaCy pattern matching to identify 'if-then' or 'if-comma' structures within the text. 
+        If multiple matches start with the same 'if' token, the longest match is selected. The search is limited 
+        to single lines, considering linebreaks in the text.
+
+        The end of a match is extended to the last comma or 'then', whichever is later in the text.
+
+        :param text: The text in which to search for 'if' clauses.
+        :param succeeding_linebreaks: A list indicating linebreaks in the text.
+        :param id: The ID to start with for the first 'if' clause found.
+        :return: The updated ID.
+        """
+        doc = self.nlp(text)
+        matcher = Matcher(self.nlp.vocab)
+        for pattern_name, pattern_func in self.parameters['if_patterns'].items():
+            matcher.add(pattern_name, [pattern_func()])
+
+        matches = matcher(doc)
+        processed_matches = {}
+
+        for match_id, start, end in matches:
+            if not succeeding_linebreaks[start:end].count(True):  # Ensure match is within a single line
+                # Extend the match end to the last comma or 'then'
+                extended_end = end
+                for i in range(end, len(doc)):
+                    if doc[i].lower_ == ',' or doc[i].lower_ == 'then':
+                        extended_end = i + 1
+                    if succeeding_linebreaks[i]:
+                        break  # Stop at line break
+
+                if start not in processed_matches or (extended_end - start) > (processed_matches[start][1] - processed_matches[start][0]):
+                    processed_matches[start] = (start, extended_end)
+
+        for start, (start, end) in processed_matches.items():
+            self.constraints['id'].append(id)
+            self.constraints['type'].append(self.type)
+            self.constraints['match'].append((start, end))
+            self.constraints['patterns'].append(self.nlp.vocab.strings[match_id].upper())
+            self.constraints['exception'].append(False)
+            self.constraints['negation'].append('')
+            self.constraints['symbol'].append('')
+            self.constraints['level'].append('')
+
+            connector_pre = 'START' if id == 1 else 'AND'
+            self.constraints['predecessor'].append((id-1, connector_pre))
+            self.constraints['successor'].append((id+1, 'AND'))
+
+            id += 1
+
+        return id
 
     def search_for_clauses(self):
         # Placeholder for 'search for clauses'
@@ -371,7 +429,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
         # Placeholder for 'rank constraints'
         pass
 
-def search_constraints(nlp, text, equality_params, inequality_params, meta_params, enumeration_summary, id=1):
+def search_constraints(nlp, text, equality_params, inequality_params, meta_params, enumeration_summary, linebreaks, id=1):
     """
     Conducts a combined search for equality, inequality, and meta (enumeration) constraints within a given text.
 
@@ -383,46 +441,34 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
     :param inequality_params: Parameters for the InequalityConstraintSearcher.
     :param meta_params: Parameters for the MetaConstraintSearcher.
     :param enumeration_summary: Enumeration summaries for meta constraint searching.
+    :param linebreaks: Information on succeding line breaks for meta constraint searching.
     :param id: The ID of the first match found by the current function within the document.
     :return constraints: A dictionary with detailed information about the found constraints. 
     :return id: The ID of the last match + 1 found by the current function within the document.
     """
     # Initialize searchers
-    inequality_searcher = InequalityConstraintSearcher(nlp, inequality_params)
-    equality_searcher = EqualityConstraintSearcher(nlp, equality_params)
-    meta_searcher = MetaConstraintSearcher(nlp, meta_params)
+    inequality = InequalityConstraintSearcher(nlp, inequality_params)
+    equality = EqualityConstraintSearcher(nlp, equality_params)
+    meta = MetaConstraintSearcher(nlp, meta_params)
 
     # Perform the searches and combine match details
-    inequality_match_details, id = inequality_searcher.search_matches(text, id)
-    equality_match_details, id = equality_searcher.search_matches(text, id)
-    enum_match_details, id = meta_searcher.search_enum_constraints(text, enumeration_summary, id)
+    id = inequality.search_matches(text, id)
+    id = equality.search_matches(text, id)
+    id = meta.search_enum_constraints(text, enumeration_summary, id)
+    id = meta.search_if_clauses(text, linebreaks, id)
 
-    # Combine matches, types, negations
-    combined_matches = inequality_match_details['match'] + equality_match_details['match'] + enum_match_details['match']
-    combined_match_types = [inequality_searcher.match_type] * len(inequality_match_details['match']) + \
-                           [equality_searcher.match_type] * len(equality_match_details['match']) + \
-                           [meta_searcher.match_type] * len(enum_match_details['match'])
-    # For visualisation
-    combined_negations = [negation[1] for negation in inequality_match_details['negation'] if negation[0]] + \
-                         [negation[1] for negation in equality_match_details['negation'] if negation[0]] + \
-                         [] * len(enum_match_details['match']) 
+    # Combine matches, types, negations for visualisation
+    combined_negations = [neg[0] for neg in inequality.constraints['negation'] if neg[1]] + \
+                         [neg[0] for neg in equality.constraints['negation'] if neg[1]] + \
+                         [] * (len(meta.constraints['match']))
 
     # Create output dict
-    constraints = {
-        'ID': inequality_match_details['id'] + equality_match_details['id'] + enum_match_details['id'],
-        'Type': combined_match_types,
-        'Match': combined_matches,
-        'Pattern': inequality_match_details['patterns'] + equality_match_details['patterns'] + enum_match_details['patterns'],
-        'Exception': inequality_match_details['exception'] + equality_match_details['exception'] + enum_match_details['exception'],
-        'Negation': inequality_match_details['negation'] + equality_match_details['negation'] + [''] * len(enum_match_details['match']),
-        'Symbol': inequality_match_details['symbol'] + equality_match_details['symbol'] + enum_match_details['symbol'],
-        'Level': inequality_match_details['level'] + equality_match_details['level'] + enum_match_details['level'],
-        'Predecessor': inequality_match_details['predecessor'] + equality_match_details['predecessor'] + enum_match_details['predecessor'],
-        'Successor': inequality_match_details['successor'] + equality_match_details['successor'] + enum_match_details['successor'],
-    }
+    constraints = {}
+    for key in inequality.constraints.keys():
+        constraints[key] = inequality.constraints[key] + equality.constraints[key] + meta.constraints[key]
 
     # Highlighting text
-    ConstraintSearcher(nlp, equality_params).highlight_matches(text, combined_matches, combined_negations, combined_match_types)
+    ConstraintSearcher(nlp, equality_params).highlight_matches(text, constraints['match'], combined_negations, constraints['type'])
 
     # Print in tabular format
     combined_table_data = zip(*constraints.values()) 
@@ -435,9 +481,7 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
 
 def search_constraints_in_data(nlp, data, equality_params, inequality_params, meta_params):
     """
-    Conducts a combined search for both equality and inequality constraints for all use cases.
-
-    This function initializes both InequalityConstraintSearcher and EqualityConstraintSearcher, performs the search, and then combines their findings.
+    Conducts a combined search for inequality, equality and meta constraints for all use cases.
 
     Wrapper function for search_constraints(). 
 
@@ -464,7 +508,7 @@ def search_constraints_in_data(nlp, data, equality_params, inequality_params, me
             for chunk_index, chunk in enumerate(row['Lemma']):  # Iterate over each chunk in the Lemma column
                 print()
                 print("++++ CHUNK ++++", "\n")
-                new_constraints, id = search_constraints(nlp, chunk, equality_params, inequality_params, meta_params, row['Enumeration'][chunk_index], id)
+                new_constraints, id = search_constraints(nlp, chunk, equality_params, inequality_params, meta_params, row['Enumeration'][chunk_index], row['Linebreak'][chunk_index], id)
                 for key, values in new_constraints.items():
                     constraints_tmp[use_case][key].extend(values)
                     if key == 'ID':  # Only append to 'Index' and 'Chunk' when new 'ID' is found
