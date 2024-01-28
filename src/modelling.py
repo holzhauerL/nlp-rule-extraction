@@ -123,12 +123,11 @@ class ConstraintSearcher:
         highlighted_text += text[last_index:]
         print(highlighted_text)
 
-    def search_matches(self, text, exception_patterns, id):
+    def search_matches(self, text, id):
         """
         Searches for matches in the text based on defined patterns, considering exceptions.
 
         :param text: The text in which to search for matches.
-        :param exception_patterns: A dictionary of patterns that should be treated as exceptions.
         :param id: The ID of the first match found by the current function within the document.
         :return unique_matches: A dictionary containing details of the unique matches found in the text.
         :return id: The ID of the last match + 1 found by the current function within the document.
@@ -140,7 +139,7 @@ class ConstraintSearcher:
 
         # Creating patterns
         patterns = self.create_patterns(merged_dict)
-        formatted_exception_patterns = {key.upper().replace(" ", "_"): value for key, value in exception_patterns.items()}
+        formatted_exception_patterns = {key.upper().replace(" ", "_"): value for key, value in self.parameters["exception_patterns"].items()}
         for key, value in formatted_exception_patterns.items():
             if callable(value):
                 patterns[key] = value()
@@ -372,9 +371,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
         # Placeholder for 'rank constraints'
         pass
 
-def search_constraints(nlp, text, equality_params, inequality_params, meta_params,
-                       inequality_exception_patterns, equality_exception_patterns,
-                       enumeration_summary, id=1):
+def search_constraints(nlp, text, equality_params, inequality_params, meta_params, enumeration_summary, id=1):
     """
     Conducts a combined search for equality, inequality, and meta (enumeration) constraints within a given text.
 
@@ -385,8 +382,6 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
     :param equality_params: Parameters for the EqualityConstraintSearcher.
     :param inequality_params: Parameters for the InequalityConstraintSearcher.
     :param meta_params: Parameters for the MetaConstraintSearcher.
-    :param inequality_exception_patterns: Exception patterns for the InequalityConstraintSearcher.
-    :param equality_exception_patterns: Exception patterns for the EqualityConstraintSearcher.
     :param enumeration_summary: Enumeration summaries for meta constraint searching.
     :param id: The ID of the first match found by the current function within the document.
     :return constraints: A dictionary with detailed information about the found constraints. 
@@ -398,8 +393,8 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
     meta_searcher = MetaConstraintSearcher(nlp, meta_params)
 
     # Perform the searches and combine match details
-    inequality_match_details, id = inequality_searcher.search_matches(text, inequality_exception_patterns, id)
-    equality_match_details, id = equality_searcher.search_matches(text, equality_exception_patterns, id)
+    inequality_match_details, id = inequality_searcher.search_matches(text, id)
+    equality_match_details, id = equality_searcher.search_matches(text, id)
     enum_match_details, id = meta_searcher.search_enum_constraints(text, enumeration_summary, id)
 
     # Combine matches, types, negations
@@ -438,7 +433,7 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
 
     return constraints, id
 
-def search_constraints_in_data(nlp, data, equality_params, inequality_params, meta_params, inequality_exception_patterns, equality_exception_patterns):
+def search_constraints_in_data(nlp, data, equality_params, inequality_params, meta_params):
     """
     Conducts a combined search for both equality and inequality constraints for all use cases.
 
@@ -451,8 +446,6 @@ def search_constraints_in_data(nlp, data, equality_params, inequality_params, me
     :param equality_params: Parameters for the EqualityConstraintSearcher.
     :param inequality_params: Parameters for the InequalityConstraintSearcher.
     :param meta_params: Parameters for the MetaConstraintSearcher.
-    :param inequality_exception_patterns: Exception patterns for the InequalityConstraintSearcher.
-    :param equality_exception_patterns: Exception patterns for the EqualityConstraintSearcher.
     :return constraints: A dictionary with detailed information about the found constraints. 
     """
     delimiter_line = "+"*80
@@ -471,7 +464,7 @@ def search_constraints_in_data(nlp, data, equality_params, inequality_params, me
             for chunk_index, chunk in enumerate(row['Lemma']):  # Iterate over each chunk in the Lemma column
                 print()
                 print("++++ CHUNK ++++", "\n")
-                new_constraints, id = search_constraints(nlp, chunk, equality_params, inequality_params, meta_params, inequality_exception_patterns, equality_exception_patterns, row['Enumeration'][chunk_index], id)
+                new_constraints, id = search_constraints(nlp, chunk, equality_params, inequality_params, meta_params, row['Enumeration'][chunk_index], id)
                 for key, values in new_constraints.items():
                     constraints_tmp[use_case][key].extend(values)
                     if key == 'ID':  # Only append to 'Index' and 'Chunk' when new 'ID' is found
