@@ -183,6 +183,16 @@ class Preprocessor:
             # Add a line break marker at the end of each line except the last
             if line != lines[-1]:
                 suc_linebreaks[-1] = True
+
+        # Remove redundant commas from output_tokens
+        processed_output_tokens = []
+        prev_token = None
+        for token in output_tokens:
+            if token == "," and prev_token == ",":
+                continue  # Skip this token if it's a redundant comma
+            processed_output_tokens.append(token)
+            prev_token = token
+        output_tokens = processed_output_tokens
         
         if self.verbose:
             sentences = [sent.text for sent in doc.sents]

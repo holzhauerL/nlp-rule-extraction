@@ -395,17 +395,17 @@ class MetaConstraintSearcher(ConstraintSearcher):
 
         for match_id, start, end in matches:
             if not succeeding_linebreaks[start:end].count(True):  # Ensure match is within a single line
-                # Extend the match end to the last comma or 'then'
-                extended_end = end
+                # reduce the match end to the last comma or 'then'
+                reduced_end = end
                 for i in range(end, start, -1):
                     if doc[i].lower_ == ',' or doc[i].lower_ == 'then':
-                        extended_end = i
+                        reduced_end = i
                         break
                 
                 negated_token, is_negated = self.check_for_negation(doc, start, self.parameters["negation_tokens"], self.parameters["window_size"])
 
-                if start not in processed_matches or (extended_end - start) > (processed_matches[start][1] - processed_matches[start][0]):
-                    processed_matches[start] = (start, extended_end)
+                if start not in processed_matches or (reduced_end - start) > (processed_matches[start][1] - processed_matches[start][0]):
+                    processed_matches[start] = (start, reduced_end)
 
         for start, (start, end) in processed_matches.items():
 
@@ -437,16 +437,21 @@ class MetaConstraintSearcher(ConstraintSearcher):
 
         for match_id, start, end in matches:
             if not succeeding_linebreaks[start:end].count(True):  # Ensure match is within a single lines
+                reduced_end = end
+                for i in range(end, start, -1):
+                    if doc[i].lower_ == ':' or doc[i].lower_ == ',':
+                        reduced_end = i
+                        break
 
-                if start not in processed_matches or (end - start) > (processed_matches[start][1] - processed_matches[start][0]):
-                    processed_matches[start] = (start, end)
+                if start not in processed_matches or (reduced_end - start) > (processed_matches[start][1] - processed_matches[start][0]):
+                    processed_matches[start] = (start, reduced_end)
 
-        for start, (start, end) in processed_matches.items():
+        for start, (start, reduced_end) in processed_matches.items():
 
             connector_pre = self.con_start if id == 1 else self.con_and
 
             # Add constraint
-            self._add_constraint(id, match=(start, end), pattern=self.nlp.vocab.strings[match_id].upper(), exception=False,connector_pre=connector_pre, connector_suc=self.con_and)
+            self._add_constraint(id, match=(start, reduced_end), pattern=self.nlp.vocab.strings[match_id].upper(), exception=False,connector_pre=connector_pre, connector_suc=self.con_and)
 
             id += 1
 
@@ -490,6 +495,7 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
     id = equality.search_matches(text, id)
     id = meta.search_enum_constraints(text, enumeration_summary, id)
     id = meta.search_if_clauses(text, linebreaks, id)
+    id = meta.search_for_clauses(text, linebreaks, id)
 
     # Combine matches, types, negations for visualisation
     combined_negations = []
