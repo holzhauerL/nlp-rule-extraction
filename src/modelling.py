@@ -1,7 +1,9 @@
+import copy
 from spacy.matcher import Matcher
 from termcolor import colored
 from tabulate import tabulate
 from collections import defaultdict
+import pandas as pd
 
 class ConstraintSearcher:
     """
@@ -17,7 +19,7 @@ class ConstraintSearcher:
         """
         self.nlp = nlp
         self.parameters = parameters
-        self.constraints = {'id': [], 'type': [], 'match': [], 'pattern': [], 'exception': [], 'negation': [], 'symbol': [],  'level': [], 'predecessor': [], 'successor': []}
+        self.constraints = {'id': [], 'type': [], 'match': [], 'pattern': [], 'exception': [], 'negation': [], 'symbol': [],  'level': [], 'predecessor': [], 'successor': [], 'context': []}
         self.type = None
         self.empty = "NA"
         self.con_follow = "FOLLOW"
@@ -26,7 +28,7 @@ class ConstraintSearcher:
         self.con_and = "AND"
         self.con_or = "OR"
 
-    def _add_constraint(self, id, match=None, pattern=None, exception=None, negation=None, symbol=None, level=None, connector_pre=None, connector_suc=None):
+    def _add_constraint(self, id, match=None, pattern=None, exception=None, negation=None, symbol=None, level=None, connector_pre=None, connector_suc=None, context=None):
         """
         Adds a new constraint to the constraints dictionary.
 
@@ -41,6 +43,7 @@ class ConstraintSearcher:
         :param level: The level of an enumeration constraint.
         :param connector_pre: The connection of the predecessor to the constraint.
         :param connector_suc: The connection of the successor to the constraint.
+        :param context: The span indicating the context for the ConstraintBuilder.
         """
         self.constraints['id'].append(id)
         self.constraints['type'].append(self.type)
@@ -52,6 +55,7 @@ class ConstraintSearcher:
         self.constraints['level'].append(level if level is not None else self.empty)
         self.constraints['predecessor'].append((id-1, connector_pre))
         self.constraints['successor'].append((id+1, connector_suc))
+        self.constraints['context'].append(context if context is not None else self.empty)
 
     def expand_dict(self, input_dict):
         """
@@ -111,7 +115,7 @@ class ConstraintSearcher:
 
         for match, mtype in zip(matches, match_types):
             if mtype != 'META':
-                combined.append((match[0], match[1], 'match', mtype))
+                combined.append((match[0], match[1] + 1, 'match', mtype))
             else:
                 # Handle the structure of the META match
                 if isinstance(match[0], tuple):  # ((start, end_enum), end)
@@ -209,7 +213,7 @@ class ConstraintSearcher:
                 seen_tokens.add(end)
 
                 # Add constraint
-                self._add_constraint(id, match=(start, end), pattern=formatted_match_str, exception=is_exception, negation=(negated_token, is_negated), symbol=symbol, connector_pre=connector_pre, connector_suc=self.con_follow)
+                self._add_constraint(id, match=(start, end-1), pattern=formatted_match_str, exception=is_exception, negation=(negated_token, is_negated), symbol=symbol, connector_pre=connector_pre, connector_suc=self.con_follow)
 
                 # Updating the ID
                 id += 1
@@ -254,6 +258,9 @@ class InequalityConstraintSearcher(ConstraintSearcher):
             phrase_pattern = [{"LOWER": word} for word in phrase.split()]
             phrase_pattern.extend([{"TEXT": {"NOT_IN": [".", ","]}, "IS_DIGIT": False, "OP": "*"},{"LIKE_NUM": True}])
             patterns[phrase] = phrase_pattern
+            # # Account for float numbers
+            # phrase_pattern_float = phrase_pattern.extend([{"TEXT": {"IN": ["."]}},{"IS_DIGIT": True}])
+            # patterns[phrase + "_float"] = phrase_pattern_float
         return patterns
 
 class EqualityConstraintSearcher(ConstraintSearcher):
@@ -456,14 +463,94 @@ class MetaConstraintSearcher(ConstraintSearcher):
             id += 1
 
         return id
+    
+    def determine_context(self, text, constraints):
+        """
+        Determines the context for each constraint, based on their type.
 
-    def search_connectors(self):
-        # Placeholder for 'search connectors'
+        :param text: The text to search within for constraints.
+        :param constraints: A dictionary with detailed information about the found constraints.
+        :return updated_constraints: The input dictionary, enhanced with context.
+        """
+
+        #TODO: Similar to rank_and_connect but simpler, this should take a constraint and determine the context as a tuple with (context_start, context_end) indicating the tokens for which the context starts and ends. CASE 1: If the 'type' equals 'EQ' and 'exception' is False, the context 
         pass
 
-    def rank_constraints(self):
-        # Placeholder for 'rank constraints'
-        pass
+    def rank_and_connect(self, text, constraints, id):
+        """
+        Ranks and connects the constraints to create the final constraint trigger structure.
+
+        :param text: The text to search within for constraints.
+        :param constraints: A dictionary with detailed information about the found constraints. 
+        :param id: The ID of the last match in the text before this method was called.
+        :return updated_constraints: A dictionary with detailed information about the ranked and connected constraints. 
+        :return id: The ID of the last match in the text after this method was called.
+        """
+        # Create a deep copy of the constraints dictionary
+        updated_constraints = constraints
+
+        # Safe parameters for later
+        org_len = len(updated_constraints['id'])
+        first_id = updated_constraints['id'][0]
+
+        # Create a DataFrame with the subset of the columns necessary for the condtion checks to reduce runtime compared to additional loops through the dictionary
+        constraints_df = pd.DataFrame.from_dict(updated_constraints)
+
+        constraints_df['match_start'] = constraints_df['match'].apply(lambda x: x[0][1] if isinstance(x[0], tuple) else x[0])
+        constraints_df['match_end'] = constraints_df['match'].apply(lambda x: x[1] if isinstance(x[0], tuple) else x[1])
+        constraints_df['level'] = constraints_df['level'].replace({'NA': 0}).astype(int)
+
+        # Keep only required columns and convert types
+        constraints_df = constraints_df[['id', 'type', 'match_start', 'match_end', 'pattern', 'level']]
+        constraints_df[['id', 'match_start', 'match_end', 'level']] = constraints_df[['id', 'match_start', 'match_end', 'level']].astype(int)
+
+        # Create the idx_map dictionary
+        idx_map = {old_idx: old_idx for old_idx in constraints_df.index}
+
+        # Iterate over rows of DataFrame
+        for index, row in constraints_df.iterrows():
+
+            # CASE 01: Enumeration item without INEQ or EQ constraint results in a boolean
+            if 'ENUM' in row['pattern']:
+                subset_indices = constraints_df[(constraints_df['match_start'] > row['match_start']) & (constraints_df['match_end'] < row['match_end']) & (constraints_df['type'] != 'META')].index
+                # If no constraint found within an enumeration item, make it a boolean one
+                if len(subset_indices) == 0:
+                    new_idx = idx_map[index]
+                    ((x,y), z) = updated_constraints['match'][new_idx]
+
+                    # Insert new list element at position after new_idx
+                    new_element = {'id': 99, 'type': self.type, 'match': (y + 1, z - 1), 'pattern': 'BOOL', 'exception': False, 'level': updated_constraints['level'][index], 'predecessor': (98, self.con_follow), 'successor': (100, self.con_follow)}
+                    for key in updated_constraints.keys():
+                        if key in new_element.keys():
+                            value = new_element[key]
+                        else:
+                            value = self.empty
+                        updated_constraints[key].insert(new_idx+1, value)
+
+                    # Update idx_map
+                    for key, value in idx_map.items():
+                        if value > new_idx:
+                            idx_map[key] = value + 1
+
+        # If any constraints were added
+        if len(updated_constraints['id']) != org_len:
+
+            # Update the IDs to match the new structure
+            last_id = first_id + len(updated_constraints['id']) - 1
+            updated_constraints['id'] = list(range(first_id, last_id + 1))
+
+            id = last_id + 1
+
+            # Update predecessor and successor IDs
+            for i in range(len(updated_constraints['predecessor'])):
+                updated_constraints['predecessor'][i] = (updated_constraints['id'][i]-1, updated_constraints['predecessor'][i][1])
+
+            for i in range(len(updated_constraints['successor'])):
+                updated_constraints['successor'][i] = (updated_constraints['id'][i]+1, updated_constraints['successor'][i][1])
+
+        # connectors = self.parameters["connectors"]
+
+        return updated_constraints, id
 
 def search_constraints(nlp, text, equality_params, inequality_params, meta_params, enumeration_summary, linebreaks, id=1, verbose=True):
     """
@@ -497,26 +584,30 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
     id = meta.search_if_clauses(text, linebreaks, id)
     id = meta.search_for_clauses(text, linebreaks, id)
 
-    # Combine matches, types, negations for visualisation
-    combined_negations = []
-    for s in searchers:
-        combined_negations.extend(neg[0] for neg in s.constraints['negation'] if isinstance(neg,tuple))
-
     # Create output dict
     constraints = {}
     for key in inequality.constraints.keys():
         constraints[key] = inequality.constraints[key] + equality.constraints[key] + meta.constraints[key]
 
-    # Highlighting text
+    # If constraints where found, rank and connect the constraints
+    if len(constraints['id']):
+        constraints, id = meta.rank_and_connect(text, constraints, id)
+    
+    # Combine matches, types, negations for visualisation
+    combined_negations = []
+    for s in searchers:
+        combined_negations.extend(neg[0] for neg in s.constraints['negation'] if isinstance(neg,tuple))
+
     if verbose:
+        # Highlight text
         ConstraintSearcher(nlp, equality_params).highlight_matches(text, constraints['match'], combined_negations, constraints['type'])
 
-    # Print in tabular format
-    combined_table_data = zip(*constraints.values()) 
-    # Only print if any of the lists in constraints has elements
-    if any(constraints.values()) and verbose: 
-        print()
-        print(tabulate(combined_table_data, headers=constraints.keys()))
+        # Print in tabular format
+        combined_table_data = zip(*constraints.values()) 
+        # Only print if any of the lists in constraints has elements
+        if any(constraints.values()): 
+            print()
+            print(tabulate(combined_table_data, headers=constraints.keys()))
 
     return constraints, id
 
