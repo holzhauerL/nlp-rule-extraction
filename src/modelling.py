@@ -464,24 +464,13 @@ class MetaConstraintSearcher(ConstraintSearcher):
 
         return id
     
-    def determine_context(self, text, constraints, linebreaks):
+    def _dict_to_df(self, constraints):
         """
-        Determines the context for each constraint, based on their type.
+        Convertes the constraints dictionary into a pandas DataFrame, while also converting certain types, imputing values and dropping columns.
 
-        :param text: The text to search within for constraints.
-        :param constraints: A dictionary with detailed information about the found constraints.
-        :param linebreaks: Boolean array indicating line breaks after each token.
-        :return constraints: The input dictionary, enhanced with context.
+        :param constraints: Dictionary with the constraints.
+        :return: DataFrame with the constraints.
         """
-
-        # Similar to rank_and_connect but simpler, this should take a text and the constraint dict and determine for each constraint in constraints the context as a tuple with (context_start, context_end) indicating the tokens for which the context starts and ends. This tuple should be safed in constraints['context'][index_of_current_constraint]. There are different cases to determine the context. Constructing a dataframe similar to rank_and_connect makes sense here as well. The general rule is that the cases are not mutually exclusive and at the end, the context tuple with the biggest context_delta = context_end - context_start should be chosen, if multiple are available.
-        
-        doc = self.nlp(text)
-        context_start = doc_start = 0
-        context_end = doc_end = len(doc) - 1
-        context_limits = set(self.parameters["context_limits"])
-
-        # Create a DataFrame with the subset of the columns necessary for the condtion checks to reduce runtime compared to additional loops through the dictionary
         constraints_df = pd.DataFrame.from_dict(constraints)
 
         constraints_df['match_start'] = constraints_df['match'].apply(lambda x: x[0][0] if isinstance(x[0], tuple) else x[0])
@@ -492,9 +481,35 @@ class MetaConstraintSearcher(ConstraintSearcher):
         constraints_df = constraints_df[['id', 'type', 'match_start', 'match_end', 'pattern', 'level']]
         constraints_df[['id', 'match_start', 'match_end', 'level']] = constraints_df[['id', 'match_start', 'match_end', 'level']].astype(int)
 
-        for index, row in constraints_df.iterrows():
+        return constraints_df
 
-            # CASE 1: If the 'type' of any constraint equals 'INEQ' or 'EQ', the context_start is the nearest token smaller than match_start which matches one of the texts in context_limits OR context_start is the nearest other match_end token smaller than match_start from any of the other constraint items OR context_start is the nearest token smaller than match_start with a succeding linebreak and then + 1, whatever is nearer to match_start. In a similar fashion, context_end is the nearest token greater than match_end which matches one of the texts in context_limits OR context_end is the nearest other match_start token greater than match_end from any of the other constraint items OR context_start is the nearest token greater than or equal to match_end with a succeding linebreak, whatever is nearer to match_end. If the 'type' of any constraint i equals 'INEQ' or 'EQ' and there is another constraint j!=i for which match_start_j <= match_start_i and match_end_j >= match_end_i with j finding the minimum abs(match_start_j - match_start_i) + abs(match_end_j - match_end_i), then context_start_i = match_start_j and context_end_i = match_end_j.
+    def determine_context(self, text, constraints, linebreaks):
+        """
+        Determines the context for each constraint, based on their type.
+
+        :param text: The text to search within for constraints.
+        :param constraints: A dictionary with detailed information about the found constraints.
+        :param linebreaks: Boolean array indicating line breaks after each token.
+        :return constraints: The input dictionary, enhanced with context.
+        """
+        doc = self.nlp(text)
+        doc_start = 0
+        doc_end = len(doc) - 1
+        context_limits = set(self.parameters["context_limits"])
+
+        # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
+        constraints_df = self._dict_to_df(constraints)
+
+        # Consider only constraints which are of type str (still empty)
+        idx = [i for i in range(len(constraints['id'])) if isinstance(constraints['context'][i],str)]
+
+        for index, row in constraints_df.loc[idx].iterrows():
+
+            # Reset context start and end
+            context_start = doc_start
+            context_end = doc_end
+
+            # Equality and inequality constraints
             if row['type'] in ['INEQ', 'EQ']:
                 # Find the encompassing constraints
                 encompassing_constraints = constraints_df[
@@ -519,11 +534,6 @@ class MetaConstraintSearcher(ConstraintSearcher):
                 context_start_options = [i for i in range(row['match_start'] - 1, -1, -1) if doc[i].text in context_limits]
                 context_start_other_constraints = [constraints_df.at[j, 'match_end'] for j in range(len(constraints_df)) if j != index and constraints_df.at[j, 'match_end'] < row['match_start']]
                 context_start_linebreaks = [i+1 for i, lb in enumerate(linebreaks) if lb and i < row['match_start']]
-                print("context_start_options", context_start_options)
-                print("context_start_other_constraints", context_start_other_constraints)
-                print("context_start_linebreaks", context_start_linebreaks)
-                print("context_start_encom", context_start_encom)
-
                 context_start = max(context_start_options + context_start_other_constraints + context_start_linebreaks + context_start_encom, default=doc_start)
 
                 # Determine context_end
@@ -531,45 +541,39 @@ class MetaConstraintSearcher(ConstraintSearcher):
                 context_end_other_constraints = [constraints_df.at[j, 'match_start'] for j in range(len(constraints_df)) if j != index and constraints_df.at[j, 'match_start'] > row['match_end']]
                 context_end_linebreaks = [i for i, lb in enumerate(linebreaks) if lb and i >= row['match_end']]
                 context_end = min(context_end_options + context_end_other_constraints + context_end_linebreaks + context_end_encom, default=doc_end)
+            # All meta constraints except for enumerations
+            elif "ENUM" not in row['pattern']:
 
-                # Update context in constraints
-                constraints['context'][index] = (context_start, context_end)
+                match_start, match_end = row['match_start'], row['match_end']
 
-            # TODO: CASE 3: If the 'type' of any constraint i equals 'EQ' and the type of another constraint j equals 'META' and j is the closest 'META' in terms of the difference match_start_j - match_end_i (under the condition that match_start_j >= match_end_i) and this constraint j has 'ENUM' in any part of its 'pattern', then context_start_i is the already found context_start_i for this item (CASE 1 or CASE 2) and context_end_i is the greatest match_end_k of all constraints of this specific 'ENUM' pattern and with 'level' of constraint k equal to 'level' of constraint j. In this case, context_start and context_end of each of the 'ENUM' constraints should be the same as the one of constraint i.
+                # Context start for META is the match start
+                context_start = match_start
 
-            # TODO: CASE 4: If the 'pattern' of any constraint contains 'ENUM' and its context is (still) a string (so still empty) and 'level' is 1, context_start for all of these constraints shall be the first token of the text and context_end for all of these shall be the last token of the text.
+                # Determine context_end
+                context_end_options = [i for i in range(row['match_end'] + 1, len(doc)) if doc[i].text in context_limits]
+                context_end_other_constraints = [constraints_df.at[j, 'match_start'] for j in range(len(constraints_df)) if j != index and constraints_df.at[j, 'match_start'] > row['match_end']]
+                context_end_linebreaks = [i for i, lb in enumerate(linebreaks) if lb and i >= row['match_end']]
+                context_end = min(context_end_options + context_end_other_constraints + context_end_linebreaks, default=doc_end)
 
-            # TODO: CASE 5: If the 'pattern' of any constraint contains 'ENUM' and its context is (still) a string (so still "empty") and 'level' is greater than 1, context_start for all of these constraints shall be the same as for any 'ENUM' constraint with 'level' is 1. 
-            
-            # TODO: CASE 6: If the 'type' of any constraint equals 'META' and its context is (still) a string (so still "empty"), the context_start of this constraint is match_start and the context_end is the nearest token greater than match_end which matches one of the texts in self.parameters['context_limits'] = [".", ";"] OR context_end is the nearest other match_start token greater than match_end from any of the other constraint items OR context_start is the nearest token greater than or equal to match_end with a succeding linebreak, whatever is nearer to match_end.
+            constraints['context'][index] = (context_start, context_end)
 
         return constraints
 
-    def rank_and_connect(self, text, constraints, id):
+    def insert_boolean(self, constraints, id):
         """
-        Ranks and connects the constraints to create the final constraint trigger structure.
+        Inserts constraints of type 'BOOL' into existing constraints dictionary.
 
-        :param text: The text to search within for constraints.
         :param constraints: A dictionary with detailed information about the found constraints. 
         :param id: The ID of the last match in the text before this method was called.
         :return constraints: A dictionary with detailed information about the ranked and connected constraints. 
         :return id: The ID of the last match in the text after this method was called.
         """
-
         # Safe parameters for later
         org_len = len(constraints['id'])
         first_id = constraints['id'][0]
 
-        # Create a DataFrame with the subset of the columns necessary for the condtion checks to reduce runtime compared to additional loops through the dictionary
-        constraints_df = pd.DataFrame.from_dict(constraints)
-
-        constraints_df['match_start'] = constraints_df['match'].apply(lambda x: x[0][1] if isinstance(x[0], tuple) else x[0])
-        constraints_df['match_end'] = constraints_df['match'].apply(lambda x: x[1])
-        constraints_df['level'] = constraints_df['level'].replace({'NA': 0}).astype(int)
-
-        # Keep only required columns and convert types
-        constraints_df = constraints_df[['id', 'type', 'match_start', 'match_end', 'pattern', 'level']]
-        constraints_df[['id', 'match_start', 'match_end', 'level']] = constraints_df[['id', 'match_start', 'match_end', 'level']].astype(int)
+        # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
+        constraints_df = self._dict_to_df(constraints)
 
         # Create the idx_map dictionary
         idx_map = {old_idx: old_idx for old_idx in constraints_df.index}
@@ -577,7 +581,6 @@ class MetaConstraintSearcher(ConstraintSearcher):
         # Iterate over rows of DataFrame
         for index, row in constraints_df.iterrows():
 
-            # CASE 01: Enumeration item without INEQ or EQ constraint results in a boolean
             if 'ENUM' in row['pattern']:
                 subset_indices = constraints_df[(constraints_df['match_start'] > row['match_start']) & (constraints_df['match_end'] < row['match_end']) & (constraints_df['type'] != 'META')].index
                 # If no constraint found within an enumeration item, make it a boolean one
@@ -585,8 +588,11 @@ class MetaConstraintSearcher(ConstraintSearcher):
                     new_idx = idx_map[index]
                     ((x,y), z) = constraints['match'][new_idx]
 
+                    match_start = y + 1
+                    match_end = z -1
+
                     # Insert new list element at position after new_idx
-                    new_element = {'id': 99, 'type': self.type, 'match': (y + 1, z - 1), 'pattern': 'BOOL', 'exception': False, 'level': constraints['level'][index], 'predecessor': (98, self.con_follow), 'successor': (100, self.con_follow)}
+                    new_element = {'id': 99, 'type': self.type, 'match': (match_start, match_end), 'pattern': 'BOOL', 'exception': False, 'level': constraints['level'][index], 'predecessor': (98, self.con_follow), 'successor': (100, self.con_follow), 'context': (match_start, match_end)}
                     for key in constraints.keys():
                         if key in new_element.keys():
                             value = new_element[key]
@@ -614,8 +620,6 @@ class MetaConstraintSearcher(ConstraintSearcher):
 
             for i in range(len(constraints['successor'])):
                 constraints['successor'][i] = (constraints['id'][i]+1, constraints['successor'][i][1])
-
-        # connectors = self.parameters["connectors"]
 
         return constraints, id
 
@@ -659,7 +663,7 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
     # If constraints where found, first determine context, then rank and connect the constraints
     if len(constraints['id']):
         constraints = meta.determine_context(text, constraints, linebreaks)
-        constraints, id = meta.rank_and_connect(text, constraints, id)
+        constraints, id = meta.insert_boolean(constraints, id)
     
     # Combine matches, types, negations for visualisation
     combined_negations = []

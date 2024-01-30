@@ -236,85 +236,6 @@ class Preprocessor:
 
         return None
 
-    def get_enum_details(self, lemmatized_chunk, succeding_linebreaks, enum_patterns_spacy):
-        """
-        Analyze a lemmatized chunk of text to identify and summarize enumeration items using spaCy Matcher. 
-        This function tracks the enumeration type, its level, and the positions of enumeration items in the text.
-
-        :param lemmatized_chunk: The lemmatized text chunk to analyze.
-        :param succeding_linebreaks: A list of booleans indicating if a line break succeeds each token.
-        :param enum_patterns_spacy: Dictionary of spaCy token patterns for enumeration matching.
-
-        :return: A list of tuples. Each tuple contains the following elements for an enumeration item:
-            - enum_type (str): The type of enumeration (e.g., bullet, number).
-            - current_level (int): The hierarchical level of the enumeration item.
-            - total_enum_counter (int): A running total count of enumeration items found.
-            - level_enum_counter (int): The count of enumeration items at the current level.
-            - start_token_number_enumerator (int): The token index where the enumeration item starts.
-            - end_token_number_enumerator (int): The token index where the enumeration item ends.
-            - end_token_number_enum_item (int): The token index where the content of the enumeration item ends.
-        """
-        # Create a matcher with the given vocab
-        matcher = Matcher(self.nlp.vocab)
-
-        # Add enumeration patterns to the matcher
-        for enum_type, pattern in enum_patterns_spacy.items():
-            matcher.add(enum_type, [pattern()])
-
-        # Process the lemmatized chunk to create a doc object
-        doc = self.nlp(lemmatized_chunk)
-
-        # Find matches using the matcher in the doc
-        matches = matcher(doc)
-
-        # Initialize variables for enumeration summary, counters, and stacks
-        summary = []
-        total_counter, previous_start = 0, None
-        level_counters, enum_stack = {}, []
-
-        # Iterate through each match found
-        for match_id, start, end in matches:
-            # Check if a linebreak succeeds the current token
-            if start > 0 and succeding_linebreaks[start - 1]:
-                # Get the enumeration type from the match
-                enum_type = self.nlp.vocab.strings[match_id]
-                total_counter += 1
-
-                # Determine the current level of the enumeration
-                current_level = next((i + 1 for i, (etype, _) in enumerate(enum_stack) if etype == enum_type), len(enum_stack) + 1)
-
-                # Add or update the enum type in the stack
-                if not enum_stack or enum_stack[-1][0] != enum_type:
-                    enum_stack.append((enum_type, current_level))
-
-                # Update the counter for the current level
-                level_counters.setdefault(current_level, 0)
-                level_counters[current_level] += 1
-
-                # Update the end token number for the previous enumeration item
-                if previous_start is not None:
-                    summary[-1] = summary[-1][:6] + (start - 1,)
-
-                # Remember the start token number for the current enumeration item
-                previous_start = start
-
-                # Append the current enumeration item details to the summary
-                summary.append((enum_type, current_level, total_counter, level_counters[current_level], start, end - 1, -1))
-
-                # Pop the stack if the current enum type differs from the last one
-                while enum_stack and enum_stack[-1][0] != enum_type:
-                    enum_stack.pop()
-
-        # Ensure that an enumeration has at least two items, otherwise it is not considered an enumeration
-        if len(summary) <= 1:
-            summary = []
-
-        # Update the end token number for the last enumeration item
-        if summary:
-            summary[-1] = summary[-1][:6] + (len(doc) - 1,)
-
-        return summary
-
     def split_to_chunks(self, text, enum_patterns, linebreak, separators=['.','!'], exceptions=True):
         """
         Splits the input into an array of text chunks, which might be a sentence or a sequence of enuemration items.
@@ -394,6 +315,85 @@ class Preprocessor:
                 sentences.append(last_sentence)
 
         return sentences
+    
+    def get_enum_details(self, lemmatized_chunk, succeding_linebreaks, enum_patterns_spacy):
+        """
+        Analyze a lemmatized chunk of text to identify and summarize enumeration items using spaCy Matcher. 
+        This function tracks the enumeration type, its level, and the positions of enumeration items in the text.
+
+        :param lemmatized_chunk: The lemmatized text chunk to analyze.
+        :param succeding_linebreaks: A list of booleans indicating if a line break succeeds each token.
+        :param enum_patterns_spacy: Dictionary of spaCy token patterns for enumeration matching.
+
+        :return: A list of tuples. Each tuple contains the following elements for an enumeration item:
+            - enum_type (str): The type of enumeration (e.g., bullet, number).
+            - current_level (int): The hierarchical level of the enumeration item.
+            - total_enum_counter (int): A running total count of enumeration items found.
+            - level_enum_counter (int): The count of enumeration items at the current level.
+            - start_token_number_enumerator (int): The token index where the enumeration item starts.
+            - end_token_number_enumerator (int): The token index where the enumeration item ends.
+            - end_token_number_enum_item (int): The token index where the content of the enumeration item ends.
+        """
+        # Create a matcher with the given vocab
+        matcher = Matcher(self.nlp.vocab)
+
+        # Add enumeration patterns to the matcher
+        for enum_type, pattern in enum_patterns_spacy.items():
+            matcher.add(enum_type, [pattern()])
+
+        # Process the lemmatized chunk to create a doc object
+        doc = self.nlp(lemmatized_chunk)
+
+        # Find matches using the matcher in the doc
+        matches = matcher(doc)
+
+        # Initialize variables for enumeration summary, counters, and stacks
+        summary = []
+        total_counter, previous_start = 0, None
+        level_counters, enum_stack = {}, []
+
+        # Iterate through each match found
+        for match_id, start, end in matches:
+            # Check if a linebreak succeeds the current token
+            if start > 0 and succeding_linebreaks[start - 1]:
+                # Get the enumeration type from the match
+                enum_type = self.nlp.vocab.strings[match_id]
+                total_counter += 1
+
+                # Determine the current level of the enumeration
+                current_level = next((i + 1 for i, (etype, _) in enumerate(enum_stack) if etype == enum_type), len(enum_stack) + 1)
+
+                # Add or update the enum type in the stack
+                if not enum_stack or enum_stack[-1][0] != enum_type:
+                    enum_stack.append((enum_type, current_level))
+
+                # Update the counter for the current level
+                level_counters.setdefault(current_level, 0)
+                level_counters[current_level] += 1
+
+                # Update the end token number for the previous enumeration item
+                if previous_start is not None:
+                    summary[-1] = summary[-1][:6] + (start - 1,)
+
+                # Remember the start token number for the current enumeration item
+                previous_start = start
+
+                # Append the current enumeration item details to the summary
+                summary.append((enum_type, current_level, total_counter, level_counters[current_level], start, end - 1, -1))
+
+                # Pop the stack if the current enum type differs from the last one
+                while enum_stack and enum_stack[-1][0] != enum_type:
+                    enum_stack.pop()
+
+        # Ensure that an enumeration has at least two items, otherwise it is not considered an enumeration
+        if len(summary) <= 1:
+            summary = []
+
+        # Update the end token number for the last enumeration item
+        if summary:
+            summary[-1] = summary[-1][:6] + (len(doc) - 1,)
+
+        return summary
 
     def optimized_preprocessing(self, replace, remove, linebreak, enum_patterns, enum_patterns_spacy):
         """
