@@ -176,10 +176,7 @@ class ConstraintSearcher:
         patterns = self.create_patterns(merged_dict)
         formatted_exception_patterns = {key.upper().replace(" ", "_"): value for key, value in self.parameters["exception_patterns"].items()}
         for key, value in formatted_exception_patterns.items():
-            if callable(value):
-                patterns[key] = value()
-            else:
-                patterns[key] = value
+            patterns[key] = value
 
         # Matching patterns
         matcher = Matcher(self.nlp.vocab)
@@ -395,7 +392,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
         doc = self.nlp(text)
         matcher = Matcher(self.nlp.vocab)
         for pattern_name, pattern_func in self.parameters['if_patterns'].items():
-            matcher.add(pattern_name, [pattern_func()])
+            matcher.add(pattern_name, [pattern_func])
 
         matches = matcher(doc)
         processed_matches = {}
@@ -437,7 +434,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
         doc = self.nlp(text)
         matcher = Matcher(self.nlp.vocab)
         for pattern_name, pattern_func in self.parameters['for_patterns'].items():
-            matcher.add(pattern_name, [pattern_func()])
+            matcher.add(pattern_name, [pattern_func])
 
         matches = matcher(doc)
         processed_matches = {}
@@ -558,14 +555,94 @@ class MetaConstraintSearcher(ConstraintSearcher):
             constraints['context'][index] = (context_start, context_end)
 
         return constraints
-
-    def insert_boolean(self, constraints, id):
+    
+    def rank_and_connect(self, text, constraints, id):
         """
-        Inserts constraints of type 'BOOL' into existing constraints dictionary.
-
+        Ranks and connects the constraints.
+        
+        :param text: The text to search within for constraints.
         :param constraints: A dictionary with detailed information about the found constraints. 
         :param id: The ID of the last match in the text before this method was called.
         :return constraints: A dictionary with detailed information about the ranked and connected constraints. 
+        :return id: The ID of the last match in the text after this method was called.
+        """
+        doc = self.nlp(text)
+        
+        # Creating connector patterns
+        patterns = {}
+        for phrase in self.parameters["connectors"].keys():
+            phrase_pattern = [{"LOWER": word} for word in phrase.split()]
+            patterns[phrase.upper().replace(" ", "_")] = phrase_pattern
+
+        # Matching patterns
+        matcher = Matcher(self.nlp.vocab)
+        for key, pattern in patterns.items():
+            matcher.add(key, [pattern])
+        matches = matcher(doc)
+
+
+        # Safe parameters for later
+        org_len = len(constraints['id'])
+        first_id = constraints['id'][0]
+
+        # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
+        constraints_df = self._dict_to_df(constraints)
+
+        # Create the idx_map dictionary
+        idx_map = {old_idx: old_idx for old_idx in constraints_df.index}
+
+        # Iterate over rows of DataFrame
+        for index, row in constraints_df.iterrows():
+
+            if 'ENUM' in row['pattern']:
+                subset_indices = constraints_df[(constraints_df['match_start'] > row['match_start']) & (constraints_df['match_end'] < row['match_end']) & (constraints_df['type'] != 'META')].index
+                # If no constraint found within an enumeration item, make it a boolean one
+                if len(subset_indices) == 0:
+                    new_idx = idx_map[index]
+                    ((x,y), z) = constraints['match'][new_idx]
+
+                    match_start = y + 1
+                    match_end = z -1
+
+                    # Insert new list element at position after new_idx
+                    new_element = {'id': 99, 'type': self.type, 'match': (match_start, match_end), 'pattern': 'BOOL', 'exception': False, 'level': constraints['level'][index], 'predecessor': (98, self.con_follow), 'successor': (100, self.con_follow), 'context': (match_start, match_end)}
+                    for key in constraints.keys():
+                        if key in new_element.keys():
+                            value = new_element[key]
+                        else:
+                            value = self.empty
+                        constraints[key].insert(new_idx+1, value)
+
+                    # Update idx_map
+                    for key, value in idx_map.items():
+                        if value > new_idx:
+                            idx_map[key] = value + 1
+
+        # If any constraints were added
+        if len(constraints['id']) != org_len:
+
+            # Update the IDs to match the new structure
+            last_id = first_id + len(constraints['id']) - 1
+            constraints['id'] = list(range(first_id, last_id + 1))
+
+            id = last_id + 1
+
+            # Update predecessor and successor IDs
+            for i in range(len(constraints['predecessor'])):
+                constraints['predecessor'][i] = (constraints['id'][i]-1, constraints['predecessor'][i][1])
+
+            for i in range(len(constraints['successor'])):
+                constraints['successor'][i] = (constraints['id'][i]+1, constraints['successor'][i][1])
+
+        return constraints, id
+
+    def insert_bool(self, constraints, id):
+        """
+        Inserts constraints of type 'BOOL' into existing constraints dictionary.
+        
+        :param constraints: A dictionary with detailed information about the found constraints. 
+        :param id: The ID of the last match in the text before this method was called.
+        :return constraints: A dictionary with the inserted 'BOOL' constraints.
         :return id: The ID of the last match in the text after this method was called.
         """
         # Safe parameters for later
@@ -660,10 +737,11 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
     for key in inequality.constraints.keys():
         constraints[key] = inequality.constraints[key] + equality.constraints[key] + meta.constraints[key]
 
-    # If constraints where found, first determine context, then rank and connect the constraints
+    # If constraints where found, first determine context, then insert 'BOOL' constraints, then rank and connect the constraints
     if len(constraints['id']):
         constraints = meta.determine_context(text, constraints, linebreaks)
-        constraints, id = meta.insert_boolean(constraints, id)
+        constraints, id = meta.rank_and_connect(text, constraints, id)
+        constraints, id = meta.insert_bool(constraints, id)
     
     # Combine matches, types, negations for visualisation
     combined_negations = []

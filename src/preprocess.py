@@ -339,7 +339,7 @@ class Preprocessor:
 
         # Add enumeration patterns to the matcher
         for enum_type, pattern in enum_patterns_spacy.items():
-            matcher.add(enum_type, [pattern()])
+            matcher.add(enum_type, [pattern])
 
         # Process the lemmatized chunk to create a doc object
         doc = self.nlp(lemmatized_chunk)
