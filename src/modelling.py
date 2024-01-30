@@ -477,8 +477,8 @@ class MetaConstraintSearcher(ConstraintSearcher):
         # Similar to rank_and_connect but simpler, this should take a text and the constraint dict and determine for each constraint in constraints the context as a tuple with (context_start, context_end) indicating the tokens for which the context starts and ends. This tuple should be safed in constraints['context'][index_of_current_constraint]. There are different cases to determine the context. Constructing a dataframe similar to rank_and_connect makes sense here as well. The general rule is that the cases are not mutually exclusive and at the end, the context tuple with the biggest context_delta = context_end - context_start should be chosen, if multiple are available.
         
         doc = self.nlp(text)
-        doc_start = 0
-        doc_end = len(doc) - 1
+        context_start = doc_start = 0
+        context_end = doc_end = len(doc) - 1
         context_limits = set(self.parameters["context_limits"])
 
         # Create a DataFrame with the subset of the columns necessary for the condtion checks to reduce runtime compared to additional loops through the dictionary
@@ -494,27 +494,46 @@ class MetaConstraintSearcher(ConstraintSearcher):
 
         for index, row in constraints_df.iterrows():
 
-            # TODO: CASE 1: If the 'type' of any constraint equals 'INEQ' or 'EQ', the context_start is the nearest token smaller than match_start which matches one of the texts in context_limits OR context_start is the nearest other match_end token smaller than match_start from any of the other constraint items OR context_start is the nearest token smaller than match_start with a succeding linebreak and then + 1, whatever is nearer to match_start. In a similar fashion, context_end is the nearest token greater than match_end which matches one of the texts in context_limits OR context_end is the nearest other match_start token greater than match_end from any of the other constraint items OR context_start is the nearest token greater than or equal to match_end with a succeding linebreak, whatever is nearer to match_end.
+            # CASE 1: If the 'type' of any constraint equals 'INEQ' or 'EQ', the context_start is the nearest token smaller than match_start which matches one of the texts in context_limits OR context_start is the nearest other match_end token smaller than match_start from any of the other constraint items OR context_start is the nearest token smaller than match_start with a succeding linebreak and then + 1, whatever is nearer to match_start. In a similar fashion, context_end is the nearest token greater than match_end which matches one of the texts in context_limits OR context_end is the nearest other match_start token greater than match_end from any of the other constraint items OR context_start is the nearest token greater than or equal to match_end with a succeding linebreak, whatever is nearer to match_end. If the 'type' of any constraint i equals 'INEQ' or 'EQ' and there is another constraint j!=i for which match_start_j <= match_start_i and match_end_j >= match_end_i with j finding the minimum abs(match_start_j - match_start_i) + abs(match_end_j - match_end_i), then context_start_i = match_start_j and context_end_i = match_end_j.
             if row['type'] in ['INEQ', 'EQ']:
+                # Find the encompassing constraints
+                encompassing_constraints = constraints_df[
+                    (constraints_df['match_start'] <= row['match_start']) &
+                    (constraints_df['match_end'] >= row['match_end']) &
+                    (constraints_df.index != index)
+                ].copy()
+                # Find the one with minimum range difference
+                if not encompassing_constraints.empty:
+                    encompassing_constraints['range_diff'] = encompassing_constraints.apply(
+                        lambda x: abs(x['match_start'] - row['match_start']) + abs(x['match_end'] - row['match_end']),
+                        axis=1
+                    )
+                    min_diff_constraint = encompassing_constraints.loc[encompassing_constraints['range_diff'].idxmin()]
+                    # Adjust context based on the found constraint
+                    context_start_encom = [min_diff_constraint['match_start']]
+                    context_end_encom = [min_diff_constraint['match_end']]
+                else:
+                    context_start_encom = context_end_encom = []
+
                 # Determine context_start
                 context_start_options = [i for i in range(row['match_start'] - 1, -1, -1) if doc[i].text in context_limits]
                 context_start_other_constraints = [constraints_df.at[j, 'match_end'] for j in range(len(constraints_df)) if j != index and constraints_df.at[j, 'match_end'] < row['match_start']]
                 context_start_linebreaks = [i+1 for i, lb in enumerate(linebreaks) if lb and i < row['match_start']]
-                print("context_start_options:", context_start_options)
-                print("context_start_other_constraints:", context_start_other_constraints)
-                print("context_start_linebreaks:", context_start_linebreaks)
-                context_start = max(context_start_options + context_start_other_constraints + context_start_linebreaks, default=doc_start)
+                print("context_start_options", context_start_options)
+                print("context_start_other_constraints", context_start_other_constraints)
+                print("context_start_linebreaks", context_start_linebreaks)
+                print("context_start_encom", context_start_encom)
+
+                context_start = max(context_start_options + context_start_other_constraints + context_start_linebreaks + context_start_encom, default=doc_start)
 
                 # Determine context_end
                 context_end_options = [i for i in range(row['match_end'] + 1, len(doc)) if doc[i].text in context_limits]
                 context_end_other_constraints = [constraints_df.at[j, 'match_start'] for j in range(len(constraints_df)) if j != index and constraints_df.at[j, 'match_start'] > row['match_end']]
                 context_end_linebreaks = [i for i, lb in enumerate(linebreaks) if lb and i >= row['match_end']]
-                context_end = min(context_end_options + context_end_other_constraints + context_end_linebreaks, default=doc_end)
+                context_end = min(context_end_options + context_end_other_constraints + context_end_linebreaks + context_end_encom, default=doc_end)
 
                 # Update context in constraints
                 constraints['context'][index] = (context_start, context_end)
-            
-            # TODO: CASE 2: If the 'type' of any constraint i equals 'INEQ' or 'EQ' and there is another constraint j!=i for which match_start_j <= match_start_i and match_end_j >= match_end_i with j finding the minimum abs(match_start_j - match_start_i) + abs(match_end_j - match_end_i), then context_start_i = match_start_j and context_end_i = match_end_j.
 
             # TODO: CASE 3: If the 'type' of any constraint i equals 'EQ' and the type of another constraint j equals 'META' and j is the closest 'META' in terms of the difference match_start_j - match_end_i (under the condition that match_start_j >= match_end_i) and this constraint j has 'ENUM' in any part of its 'pattern', then context_start_i is the already found context_start_i for this item (CASE 1 or CASE 2) and context_end_i is the greatest match_end_k of all constraints of this specific 'ENUM' pattern and with 'level' of constraint k equal to 'level' of constraint j. In this case, context_start and context_end of each of the 'ENUM' constraints should be the same as the one of constraint i.
 
@@ -545,7 +564,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
         constraints_df = pd.DataFrame.from_dict(constraints)
 
         constraints_df['match_start'] = constraints_df['match'].apply(lambda x: x[0][1] if isinstance(x[0], tuple) else x[0])
-        constraints_df['match_end'] = constraints_df['match'].apply(lambda x: x[1] if isinstance(x[0], tuple) else x[1])
+        constraints_df['match_end'] = constraints_df['match'].apply(lambda x: x[1])
         constraints_df['level'] = constraints_df['level'].replace({'NA': 0}).astype(int)
 
         # Keep only required columns and convert types
