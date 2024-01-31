@@ -461,7 +461,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
 
         return id
     
-    def _dict_to_df(self, constraints):
+    def _dict_to_df(self, constraints, columns_to_keep = ['id', 'type', 'match_start', 'match_end', 'pattern', 'level']):
         """
         Convertes the constraints dictionary into a pandas DataFrame, while also converting certain types, imputing values and dropping columns.
 
@@ -470,13 +470,24 @@ class MetaConstraintSearcher(ConstraintSearcher):
         """
         constraints_df = pd.DataFrame.from_dict(constraints)
 
-        constraints_df['match_start'] = constraints_df['match'].apply(lambda x: x[0][0] if isinstance(x[0], tuple) else x[0])
-        constraints_df['match_end'] = constraints_df['match'].apply(lambda x: x[1])
-        constraints_df['level'] = constraints_df['level'].replace({'NA': 0}).astype(int)
 
-        # Keep only required columns and convert types
-        constraints_df = constraints_df[['id', 'type', 'match_start', 'match_end', 'pattern', 'level']]
-        constraints_df[['id', 'match_start', 'match_end', 'level']] = constraints_df[['id', 'match_start', 'match_end', 'level']].astype(int)
+        if 'match_start' in columns_to_keep:
+            constraints_df['match_start'] = constraints_df['match'].apply(lambda x: x[0][0] if isinstance(x[0], tuple) else x[0]).astype(int)
+        
+        if 'match_end' in columns_to_keep:
+            constraints_df['match_end'] = constraints_df['match'].apply(lambda x: x[1]).astype(int)
+
+        if 'level' in columns_to_keep:
+            constraints_df['level'] = constraints_df['level'].replace({'NA': 0}).astype(int)
+
+        if 'context_start' in columns_to_keep:
+            constraints_df['context_start'] = constraints_df['context'].apply(lambda x: x[0]).astype(int)
+        
+        if 'context_end' in columns_to_keep:
+            constraints_df['context_end'] = constraints_df['context'].apply(lambda x: x[1]).astype(int)
+
+        # Keep only required columns
+        constraints_df = constraints_df[columns_to_keep]
 
         return constraints_df
 
@@ -539,18 +550,21 @@ class MetaConstraintSearcher(ConstraintSearcher):
                 context_end_linebreaks = [i for i, lb in enumerate(linebreaks) if lb and i >= row['match_end']]
                 context_end = min(context_end_options + context_end_other_constraints + context_end_linebreaks + context_end_encom, default=doc_end)
             # All meta constraints except for enumerations
-            elif "ENUM" not in row['pattern']:
+            else:
 
                 match_start, match_end = row['match_start'], row['match_end']
 
                 # Context start for META is the match start
                 context_start = match_start
 
-                # Determine context_end
-                context_end_options = [i for i in range(row['match_end'] + 1, len(doc)) if doc[i].text in context_limits]
-                context_end_other_constraints = [constraints_df.at[j, 'match_start'] for j in range(len(constraints_df)) if j != index and constraints_df.at[j, 'match_start'] > row['match_end']]
-                context_end_linebreaks = [i for i, lb in enumerate(linebreaks) if lb and i >= row['match_end']]
-                context_end = min(context_end_options + context_end_other_constraints + context_end_linebreaks, default=doc_end)
+                if "ENUM" not in row['pattern']:
+                    # Determine context_end for non-enumeration meta constraints
+                    context_end_options = [i for i in range(row['match_end'] + 1, len(doc)) if doc[i].text in context_limits]
+                    context_end_other_constraints = [constraints_df.at[j, 'match_start'] for j in range(len(constraints_df)) if j != index and constraints_df.at[j, 'match_start'] > row['match_end']]
+                    context_end_linebreaks = [i for i, lb in enumerate(linebreaks) if lb and i >= row['match_end']]
+                    context_end = min(context_end_options + context_end_other_constraints + context_end_linebreaks, default=doc_end)
+                else:
+                    context_end = match_end
 
             constraints['context'][index] = (context_start, context_end)
 
@@ -566,7 +580,15 @@ class MetaConstraintSearcher(ConstraintSearcher):
         :return constraints: A dictionary with detailed information about the ranked and connected constraints. 
         :return id: The ID of the last match in the text after this method was called.
         """
-        doc = self.nlp(text)
+        # Safe parameters for later
+        org_len = len(constraints['id'])
+        first_id = constraints['id'][0]
+
+        # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
+        constraints_df = self._dict_to_df(constraints, columns_to_keep = ['id', 'type', 'match_start', 'match_end', 'pattern', 'level', 'context_start', 'context_end'])
+
+        # Create the idx_map dictionary
+        idx_map = {old_idx: old_idx for old_idx in constraints_df.index}
         
         # Creating connector patterns
         patterns = {}
@@ -578,61 +600,71 @@ class MetaConstraintSearcher(ConstraintSearcher):
         matcher = Matcher(self.nlp.vocab)
         for key, pattern in patterns.items():
             matcher.add(key, [pattern])
+        
+        doc = self.nlp(text)
         matches = matcher(doc)
 
+        # for match_id, start, end in matches:
 
-        # Safe parameters for later
-        org_len = len(constraints['id'])
-        first_id = constraints['id'][0]
+        #     subset_left = constraints_df[(constraints_df['match_end'] < start) & (constraints_df['context_end'] < row['match_end']) & (constraints_df['type'] != 'META')].index
 
-        # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
-        constraints_df = self._dict_to_df(constraints)
+            # TODO: CASE 1: If there is a connector item in between two constraints and within both of their context, create a new constraint
 
-        # Create the idx_map dictionary
-        idx_map = {old_idx: old_idx for old_idx in constraints_df.index}
 
-        # Iterate over rows of DataFrame
-        for index, row in constraints_df.iterrows():
+        # TODO: Add the missing code while reuising parts of the below commented code section, if applicable
 
-            if 'ENUM' in row['pattern']:
-                subset_indices = constraints_df[(constraints_df['match_start'] > row['match_start']) & (constraints_df['match_end'] < row['match_end']) & (constraints_df['type'] != 'META')].index
-                # If no constraint found within an enumeration item, make it a boolean one
-                if len(subset_indices) == 0:
-                    new_idx = idx_map[index]
-                    ((x,y), z) = constraints['match'][new_idx]
+        # # Safe parameters for later
+        # org_len = len(constraints['id'])
+        # first_id = constraints['id'][0]
 
-                    match_start = y + 1
-                    match_end = z -1
+        # # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
+        # constraints_df = self._dict_to_df(constraints)
 
-                    # Insert new list element at position after new_idx
-                    new_element = {'id': 99, 'type': self.type, 'match': (match_start, match_end), 'pattern': 'BOOL', 'exception': False, 'level': constraints['level'][index], 'predecessor': (98, self.con_follow), 'successor': (100, self.con_follow), 'context': (match_start, match_end)}
-                    for key in constraints.keys():
-                        if key in new_element.keys():
-                            value = new_element[key]
-                        else:
-                            value = self.empty
-                        constraints[key].insert(new_idx+1, value)
+        # # Create the idx_map dictionary
+        # idx_map = {old_idx: old_idx for old_idx in constraints_df.index}
 
-                    # Update idx_map
-                    for key, value in idx_map.items():
-                        if value > new_idx:
-                            idx_map[key] = value + 1
+        # # Iterate over rows of DataFrame
+        # for index, row in constraints_df.iterrows():
 
-        # If any constraints were added
-        if len(constraints['id']) != org_len:
+        #     if 'ENUM' in row['pattern']:
+        #         subset_indices = constraints_df[(constraints_df['match_start'] > row['match_start']) & (constraints_df['match_end'] < row['match_end']) & (constraints_df['type'] != 'META')].index
+        #         # If no constraint found within an enumeration item, make it a boolean one
+        #         if len(subset_indices) == 0:
+        #             new_idx = idx_map[index]
+        #             ((x,y), z) = constraints['match'][new_idx]
 
-            # Update the IDs to match the new structure
-            last_id = first_id + len(constraints['id']) - 1
-            constraints['id'] = list(range(first_id, last_id + 1))
+        #             match_start = y + 1
+        #             match_end = z -1
 
-            id = last_id + 1
+        #             # Insert new list element at position after new_idx
+        #             new_element = {'id': 99, 'type': self.type, 'match': (match_start, match_end), 'pattern': 'BOOL', 'exception': False, 'level': constraints['level'][index], 'predecessor': (98, self.con_follow), 'successor': (100, self.con_follow), 'context': (match_start, match_end)}
+        #             for key in constraints.keys():
+        #                 if key in new_element.keys():
+        #                     value = new_element[key]
+        #                 else:
+        #                     value = self.empty
+        #                 constraints[key].insert(new_idx+1, value)
 
-            # Update predecessor and successor IDs
-            for i in range(len(constraints['predecessor'])):
-                constraints['predecessor'][i] = (constraints['id'][i]-1, constraints['predecessor'][i][1])
+        #             # Update idx_map
+        #             for key, value in idx_map.items():
+        #                 if value > new_idx:
+        #                     idx_map[key] = value + 1
 
-            for i in range(len(constraints['successor'])):
-                constraints['successor'][i] = (constraints['id'][i]+1, constraints['successor'][i][1])
+        # # If any constraints were added
+        # if len(constraints['id']) != org_len:
+
+        #     # Update the IDs to match the new structure
+        #     last_id = first_id + len(constraints['id']) - 1
+        #     constraints['id'] = list(range(first_id, last_id + 1))
+
+        #     id = last_id + 1
+
+        #     # Update predecessor and successor IDs
+        #     for i in range(len(constraints['predecessor'])):
+        #         constraints['predecessor'][i] = (constraints['id'][i]-1, constraints['predecessor'][i][1])
+
+        #     for i in range(len(constraints['successor'])):
+        #         constraints['successor'][i] = (constraints['id'][i]+1, constraints['successor'][i][1])
 
         return constraints, id
 
@@ -740,8 +772,8 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
     # If constraints where found, first determine context, then insert 'BOOL' constraints, then rank and connect the constraints
     if len(constraints['id']):
         constraints = meta.determine_context(text, constraints, linebreaks)
-        constraints, id = meta.rank_and_connect(text, constraints, id)
         constraints, id = meta.insert_bool(constraints, id)
+        # constraints, id = meta.rank_and_connect(text, constraints, id)
     
     # Combine matches, types, negations for visualisation
     combined_negations = []
