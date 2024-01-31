@@ -113,26 +113,25 @@ class ConstraintSearcher:
         highlighted_indices = set()  # Set to keep track of highlighted tokens
         linebreak_indices = [] # Indices of characters with succeeding linebreaks
         for token in doc:
-            if linebreaks[token.i]:
-                linebreak_indices.append(doc[token.i].idx + len(doc[token.i].text))
+            try:
+                if linebreaks[token.i]:
+                    linebreak_indices.append(doc[token.i].idx + len(doc[token.i].text))
+            except:
+                pass # To prevent errors due to a non-optimal tokenisation (example: 1,2 counted as one token due to missing space)
 
         # Remove duplicates and None elements
         negations = [n for n in set(negations) if n is not None]
 
         for match, mtype, pattern in zip(matches, match_types, patterns):
-            if mtype != 'META':
-                combined.append((match[0], match[1] + 1, 'match', mtype, pattern))
+            if isinstance(match[0], tuple):  # ((start, end_enum), end)
+                range_match, single_token = match
+                combined.append((range_match[0], range_match[1] + 1, 'match', mtype, pattern))
+                combined.append((match[1], match[1] + 1, 'match', mtype, pattern))
+            elif match[1] - match[0] > 1:  # (start, end)
+                combined.append((match[0], match[0] + 1, 'match', mtype, pattern))
+                combined.append((match[1], match[1] + 1, 'match', mtype, pattern))
             else:
-                # Handle the structure of the META match
-                if isinstance(match[0], tuple):  # ((start, end_enum), end)
-                    range_match, single_token = match
-                    combined.append((range_match[0], range_match[1], 'match', mtype, pattern))
-                    combined.append((match[1], match[1] + 1, 'match', mtype, pattern))
-                elif match[1] - match[0] >1:  # (start, end)
-                    combined.append((match[0], match[0] + 1, 'match', mtype, pattern))
-                    combined.append((match[1], match[1] + 1, 'match', mtype, pattern))
-                else:
-                    combined.append((match[0], match[1] + 1, 'match', mtype, pattern))
+                combined.append((match[0], match[1] + 1, 'match', mtype, pattern))
 
         combined.extend([(negation, negation + 1, 'negation', None, pattern) for negation in negations])
         combined.sort(key=lambda x: x[0])
@@ -617,18 +616,26 @@ class MetaConstraintSearcher(ConstraintSearcher):
         # Iterate over rows of DataFrame
         for index, row in constraints_df.iterrows():
 
-            if 'ENUM' in row['pattern']:
-                subset_indices = constraints_df[(constraints_df['match_start'] > row['match_start']) & (constraints_df['match_end'] < row['match_end']) & (constraints_df['type'] != 'META')].index
+           if any(x in row['pattern'] for x in ['ENUM', 'FOR_', 'IF_']):
+                subset_indices = constraints_df[(constraints_df['match_start'] > row['match_start']) & (constraints_df['match_end'] < row['match_end'])].index
                 # If no constraint found within an enumeration item, make it a boolean one
                 if len(subset_indices) == 0:
                     new_idx = idx_map[index]
-                    ((x,y), z) = constraints['match'][new_idx]
-
+                    if 'ENUM' in row['pattern']:
+                        ((x,y),z) = constraints['match'][new_idx]
+                    else:
+                        y,z = constraints['match'][new_idx]
+                    
                     match_start = y + 1
-                    match_end = z -1
+                    match_end = z - 1
+
+                    if match_start > match_end:
+                        tmp = match_start
+                        match_start = match_end
+                        match_end = tmp
 
                     # Insert new list element at position after new_idx
-                    new_element = {'id': 99, 'type': self.type, 'match': (match_start, match_end), 'pattern': 'BOOL', 'exception': False, 'level': constraints['level'][index], 'predecessor': (98, self.con_follow), 'successor': (100, self.con_follow), 'context': (match_start, match_end)}
+                    new_element = {'id': 99, 'type': self.type, 'match': (match_start, match_end), 'pattern': 'BOOL', 'exception': False, 'symbol': "==",'level': constraints['level'][new_idx], 'predecessor': (98, self.con_follow), 'successor': (100, self.con_follow), 'context': (match_start, match_end)}
                     for key in constraints.keys():
                         if key in new_element.keys():
                             value = new_element[key]
@@ -785,7 +792,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
     #     Ranks and sorts the constraints.
         
     #     :param constraints: A dictionary with detailed information about the found constraints.
-    #     :return constraints: A dictionary with detailed information about the ranked and connected constraints. 
+    #     :return constraints: A dictionary with detailed information about the ranked and sorted constraints. 
     #     :return id: The ID of the last match in the text after this method was called.
     #     """
     #     # Safe parameters for later

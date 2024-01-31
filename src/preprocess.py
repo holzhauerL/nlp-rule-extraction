@@ -95,7 +95,7 @@ class Preprocessor:
 
         return text
 
-    def chng_stpwrds(self, add=[],remove=[],remove_numbers=False,restore_default=False, default_filename = 'stopwords_en.pickle'):
+    def chng_stpwrds(self, add=[],remove=[],remove_numbers=False,restore_default=False, default_filename = '_stopwords_en.pickle'):
         """
         Adds and removes stop words to the default of SpaCy. 
 
@@ -377,6 +377,13 @@ class Preprocessor:
 
                 # Remember the start token number for the current enumeration item
                 previous_start = start
+
+                # Adjust for a speciality in a pattern
+                try:
+                    if enum_type == 'number_with_dot':
+                        end -= 1
+                except:
+                    pass
 
                 # Append the current enumeration item details to the summary
                 summary.append((enum_type, current_level, total_counter, level_counters[current_level], start, end - 1, -1))
