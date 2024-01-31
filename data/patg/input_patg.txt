@@ -1,8 +1,6 @@
 # Section 34
 
-(1) An application for the grant of a patent for an 
-    invention is to be filed with the German Patent 
-    and Trade Mark Office.
+(1) An application for the grant of a patent for an invention is to be filed with the German Patent and Trade Mark Office.
 
 (3) The application must contain:
 

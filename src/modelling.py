@@ -92,13 +92,14 @@ class ConstraintSearcher:
                 return doc[i].i, True
         return None, False
 
-    def highlight_matches(self, text, matches, negations, match_types, patterns):
+    def highlight_matches(self, text, linebreaks, matches, negations, match_types, patterns):
         """
         Highlights the matches in the text based on their types and negations. 
         Uses different colors for different types of matches and negations. 
         Ensures that a token is highlighted only once.
 
         :param text: The original text in which matches are to be highlighted.
+        :param linebreaks: Information on succeding line breaks for meta constraint searching.
         :param matches: A list of match tuples (start_index, end_index) or ((start_index, end_index), token_index) for 'META' type.
         :param negations: A list of indices where negations occur.
         :param match_types: A list of types corresponding to each match.
@@ -110,6 +111,10 @@ class ConstraintSearcher:
         last_index = 0
         combined = []
         highlighted_indices = set()  # Set to keep track of highlighted tokens
+        linebreak_indices = [] # Indices of characters with succeeding linebreaks
+        for token in doc:
+            if linebreaks[token.i]:
+                linebreak_indices.append(doc[token.i].idx + len(doc[token.i].text))
 
         # Remove duplicates and None elements
         negations = [n for n in set(negations) if n is not None]
@@ -133,11 +138,26 @@ class ConstraintSearcher:
         combined.sort(key=lambda x: x[0])
 
         for start, end, type, mtype, pattern in combined:
+
             if start in highlighted_indices:
                 continue  # Skip if start index is already highlighted
 
             start_char = doc[start].idx
             end_char = doc[end - 1].idx + len(doc[end - 1].text)
+
+            # Add text before the current match/negation
+            while True:
+                if len(linebreak_indices):
+                    if linebreak_indices[0] <= start_char:
+                        highlighted_text += text[last_index:linebreak_indices[0]]
+                        highlighted_text += "\n"
+                        last_index = linebreak_indices[0]
+                        linebreak_indices.pop(0)
+                    else:
+                        break
+                else:
+                    break
+
             highlighted_text += text[last_index:start_char]
 
             # Determine color based on type and match type
@@ -907,7 +927,7 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
 
     if verbose:
         # Highlight text
-        ConstraintSearcher(nlp, equality_params).highlight_matches(text, constraints['match'], combined_negations, constraints['type'], constraints['pattern'])
+        ConstraintSearcher(nlp, equality_params).highlight_matches(text, linebreaks, constraints['match'], combined_negations, constraints['type'], constraints['pattern'])
 
         # Print in tabular format
         combined_table_data = zip(*constraints.values()) 
