@@ -92,7 +92,7 @@ class ConstraintSearcher:
                 return doc[i].i, True
         return None, False
 
-    def highlight_matches(self, text, matches, negations, match_types):
+    def highlight_matches(self, text, matches, negations, match_types, patterns):
         """
         Highlights the matches in the text based on their types and negations. 
         Uses different colors for different types of matches and negations. 
@@ -102,6 +102,7 @@ class ConstraintSearcher:
         :param matches: A list of match tuples (start_index, end_index) or ((start_index, end_index), token_index) for 'META' type.
         :param negations: A list of indices where negations occur.
         :param match_types: A list of types corresponding to each match.
+        :param patterns: A list of pattern names corresponding to each match.
         :return: None. The function prints the highlighted text.
         """
         doc = self.nlp(text)
@@ -113,23 +114,25 @@ class ConstraintSearcher:
         # Remove duplicates and None elements
         negations = [n for n in set(negations) if n is not None]
 
-        for match, mtype in zip(matches, match_types):
+        for match, mtype, pattern in zip(matches, match_types, patterns):
             if mtype != 'META':
-                combined.append((match[0], match[1] + 1, 'match', mtype))
+                combined.append((match[0], match[1] + 1, 'match', mtype, pattern))
             else:
                 # Handle the structure of the META match
                 if isinstance(match[0], tuple):  # ((start, end_enum), end)
                     range_match, single_token = match
-                    combined.append((range_match[0], range_match[1], 'match', mtype))
-                    combined.append((match[1], match[1] + 1, 'match', mtype))
-                else:  # (start, end)
-                    combined.append((match[0], match[0] + 1, 'match', mtype))
-                    combined.append((match[1], match[1] + 1, 'match', mtype))
+                    combined.append((range_match[0], range_match[1], 'match', mtype, pattern))
+                    combined.append((match[1], match[1] + 1, 'match', mtype, pattern))
+                elif match[1] - match[0] >1:  # (start, end)
+                    combined.append((match[0], match[0] + 1, 'match', mtype, pattern))
+                    combined.append((match[1], match[1] + 1, 'match', mtype, pattern))
+                else:
+                    combined.append((match[0], match[1] + 1, 'match', mtype, pattern))
 
-        combined.extend([(negation, negation + 1, 'negation', None) for negation in negations])
+        combined.extend([(negation, negation + 1, 'negation', None, pattern) for negation in negations])
         combined.sort(key=lambda x: x[0])
 
-        for start, end, type, mtype in combined:
+        for start, end, type, mtype, pattern in combined:
             if start in highlighted_indices:
                 continue  # Skip if start index is already highlighted
 
@@ -144,8 +147,10 @@ class ConstraintSearcher:
                     color = 'green'
                 elif mtype == 'EQ':
                     color = 'blue'
-                elif mtype == 'META':
+                elif mtype == 'META' and "CONNECTOR" not in pattern:
                     color = 'yellow'
+                elif mtype == 'META':
+                    color = 'magenta'
             elif type == 'negation':
                 color = 'red'
 
@@ -569,104 +574,6 @@ class MetaConstraintSearcher(ConstraintSearcher):
             constraints['context'][index] = (context_start, context_end)
 
         return constraints
-    
-    def rank_and_connect(self, text, constraints, id):
-        """
-        Ranks and connects the constraints.
-        
-        :param text: The text to search within for constraints.
-        :param constraints: A dictionary with detailed information about the found constraints. 
-        :param id: The ID of the last match in the text before this method was called.
-        :return constraints: A dictionary with detailed information about the ranked and connected constraints. 
-        :return id: The ID of the last match in the text after this method was called.
-        """
-        # Safe parameters for later
-        org_len = len(constraints['id'])
-        first_id = constraints['id'][0]
-
-        # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
-        constraints_df = self._dict_to_df(constraints, columns_to_keep = ['id', 'type', 'match_start', 'match_end', 'pattern', 'level', 'context_start', 'context_end'])
-
-        # Create the idx_map dictionary
-        idx_map = {old_idx: old_idx for old_idx in constraints_df.index}
-        
-        # Creating connector patterns
-        patterns = {}
-        for phrase in self.parameters["connectors"].keys():
-            phrase_pattern = [{"LOWER": word} for word in phrase.split()]
-            patterns[phrase.upper().replace(" ", "_")] = phrase_pattern
-
-        # Matching patterns
-        matcher = Matcher(self.nlp.vocab)
-        for key, pattern in patterns.items():
-            matcher.add(key, [pattern])
-        
-        doc = self.nlp(text)
-        matches = matcher(doc)
-
-        # for match_id, start, end in matches:
-
-        #     subset_left = constraints_df[(constraints_df['match_end'] < start) & (constraints_df['context_end'] < row['match_end']) & (constraints_df['type'] != 'META')].index
-
-            # TODO: CASE 1: If there is a connector item in between two constraints and within both of their context, create a new constraint
-
-
-        # TODO: Add the missing code while reuising parts of the below commented code section, if applicable
-
-        # # Safe parameters for later
-        # org_len = len(constraints['id'])
-        # first_id = constraints['id'][0]
-
-        # # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
-        # constraints_df = self._dict_to_df(constraints)
-
-        # # Create the idx_map dictionary
-        # idx_map = {old_idx: old_idx for old_idx in constraints_df.index}
-
-        # # Iterate over rows of DataFrame
-        # for index, row in constraints_df.iterrows():
-
-        #     if 'ENUM' in row['pattern']:
-        #         subset_indices = constraints_df[(constraints_df['match_start'] > row['match_start']) & (constraints_df['match_end'] < row['match_end']) & (constraints_df['type'] != 'META')].index
-        #         # If no constraint found within an enumeration item, make it a boolean one
-        #         if len(subset_indices) == 0:
-        #             new_idx = idx_map[index]
-        #             ((x,y), z) = constraints['match'][new_idx]
-
-        #             match_start = y + 1
-        #             match_end = z -1
-
-        #             # Insert new list element at position after new_idx
-        #             new_element = {'id': 99, 'type': self.type, 'match': (match_start, match_end), 'pattern': 'BOOL', 'exception': False, 'level': constraints['level'][index], 'predecessor': (98, self.con_follow), 'successor': (100, self.con_follow), 'context': (match_start, match_end)}
-        #             for key in constraints.keys():
-        #                 if key in new_element.keys():
-        #                     value = new_element[key]
-        #                 else:
-        #                     value = self.empty
-        #                 constraints[key].insert(new_idx+1, value)
-
-        #             # Update idx_map
-        #             for key, value in idx_map.items():
-        #                 if value > new_idx:
-        #                     idx_map[key] = value + 1
-
-        # # If any constraints were added
-        # if len(constraints['id']) != org_len:
-
-        #     # Update the IDs to match the new structure
-        #     last_id = first_id + len(constraints['id']) - 1
-        #     constraints['id'] = list(range(first_id, last_id + 1))
-
-        #     id = last_id + 1
-
-        #     # Update predecessor and successor IDs
-        #     for i in range(len(constraints['predecessor'])):
-        #         constraints['predecessor'][i] = (constraints['id'][i]-1, constraints['predecessor'][i][1])
-
-        #     for i in range(len(constraints['successor'])):
-        #         constraints['successor'][i] = (constraints['id'][i]+1, constraints['successor'][i][1])
-
-        return constraints, id
 
     def insert_bool(self, constraints, id):
         """
@@ -731,6 +638,223 @@ class MetaConstraintSearcher(ConstraintSearcher):
                 constraints['successor'][i] = (constraints['id'][i]+1, constraints['successor'][i][1])
 
         return constraints, id
+    
+    def insert_connections(self, text, constraints, id):
+        """
+        Searches and inserts connections in between constraints.
+        
+        :param text: The text to search within for constraints.
+        :param constraints: A dictionary with detailed information about the found constraints. 
+        :param id: The ID of the last match in the text before this method was called.
+        :return constraints: A dictionary with detailed information about the ranked and connected constraints. 
+        :return id: The ID of the last match in the text after this method was called.
+        """
+        # Safe parameters for later
+        org_len = len(constraints['id'])
+        first_id = constraints['id'][0]
+
+        # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
+        constraints_df = self._dict_to_df(constraints, columns_to_keep = ['id', 'type', 'match_start', 'match_end', 'pattern', 'level', 'context_start', 'context_end'])
+
+        # Create the idx_map dictionary
+        idx_map = {old_idx: old_idx for old_idx in constraints_df.index}
+        
+        # Creating connector patterns
+        patterns = {}
+        for phrase in self.parameters["connectors"].keys():
+            phrase_pattern = [{"LOWER": word} for word in phrase.split()]
+            patterns[phrase.upper().replace(" ", "_")] = phrase_pattern
+
+        exception_patterns = []
+
+        # Adding connector exception patterns
+        for key, value in self.parameters["connector_exception_pattern"].items():
+            phrase_pattern = [{"LOWER": word} for word in value[0].split()]
+            exception_patterns.append(key.upper().replace(" ", "_"))
+            patterns[exception_patterns[-1]] = phrase_pattern
+
+        # Matching patterns
+        matcher = Matcher(self.nlp.vocab)
+        for key, pattern in patterns.items():
+            matcher.add(key, [pattern])
+        
+        doc = self.nlp(text)
+        matches = matcher(doc)
+
+        for match_id, start, end in matches:
+
+            # Default connectors
+            if self.nlp.vocab.strings[match_id] not in exception_patterns:
+                exception = False
+                connector = self.parameters["connectors"][self.nlp.vocab.strings[match_id].lower().replace("_", " ")]
+
+                subset_idx_left = constraints_df[(constraints_df['match_end'] <= start) & (constraints_df['context_end'] >= end)].index
+
+                subset_idx_right = constraints_df[(constraints_df['match_start'] >= end)].index
+
+                # Check if subset_idx_left is not empty, then find the index for which the corresponding match_end is the highest
+                if not subset_idx_left.empty :
+                    max_end_idx = constraints_df.loc[subset_idx_left, 'match_end'].idxmax()
+                    if max_end_idx in subset_idx_left:
+                        left_idx = max_end_idx
+                    else:
+                        left_idx = None
+                else:
+                    left_idx = None
+
+                # Check if subset_idx_right is not empty, then find the index for which the corresponding match_start is the lowest
+                if not subset_idx_right.empty:
+                    min_start_idx = constraints_df.loc[subset_idx_right, 'match_start'].idxmin()
+                    if min_start_idx in subset_idx_right:
+                        right_idx = min_start_idx
+                    else:
+                        right_idx = None
+                else:
+                    right_idx = None
+            # Exception
+            else:
+                exception = True
+                connector = self.parameters["connector_exception_pattern"][self.nlp.vocab.strings[match_id].lower().replace("_", " ")][1]
+                # Check if there is an encompassing enumeration constraint
+                enum_idx = constraints_df[(constraints_df['context_start'] < start) & (constraints_df['context_end'] > end) & (constraints_df['pattern'].str.contains("ENUM"))].index
+                # Only consider those exceptions within the context of an enumeration item
+                if not enum_idx.empty:
+                    left_idx = right_idx = enum_idx[0]
+                else:
+                    left_idx = right_idx = None
+
+            # Check if both left_idx and right_idx are not None
+            if left_idx is not None and right_idx is not None:
+                new_idx = idx_map[left_idx] + 1
+
+                # Insert new list element at position after new_idx
+                new_element = {'id': 99, 'type': self.type, 'match': (start, end - 1), 'pattern': 'CONNECTOR_' + self.nlp.vocab.strings[match_id], 'exception': exception, 'level': self.empty, 'predecessor': (left_idx, connector), 'successor': (right_idx, connector), 'context': (constraints_df.at[left_idx, 'context_start'], constraints_df.at[right_idx, 'context_end'])}
+
+                for key in constraints.keys():
+                    if key in new_element.keys():
+                        value = new_element[key]
+                    else:
+                        value = self.empty
+                    constraints[key].insert(new_idx+1, value)
+
+                # Update idx_map
+                for key, value in idx_map.items():
+                    if value > new_idx:
+                        idx_map[key] = value + 1
+
+        # If any constraints were added
+        if len(constraints['id']) != org_len:
+
+            # Update the IDs to match the new structure
+            last_id = first_id + len(constraints['id']) - 1
+            constraints['id'] = list(range(first_id, last_id + 1))
+
+            id = last_id + 1
+
+            # Update predecessor and successor IDs
+            for i in range(len(constraints['predecessor'])):
+                constraints['predecessor'][i] = (constraints['id'][i]-1, constraints['predecessor'][i][1])
+
+            for i in range(len(constraints['successor'])):
+                constraints['successor'][i] = (constraints['id'][i]+1, constraints['successor'][i][1])
+
+        return constraints, id
+    
+    # def rank_and_sort(self, constraints):
+    #     """
+    #     Ranks and sorts the constraints.
+        
+    #     :param constraints: A dictionary with detailed information about the found constraints.
+    #     :return constraints: A dictionary with detailed information about the ranked and connected constraints. 
+    #     :return id: The ID of the last match in the text after this method was called.
+    #     """
+    #     # Safe parameters for later
+    #     org_len = len(constraints['id'])
+    #     first_id = constraints['id'][0]
+
+    #     # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
+    #     constraints_df = self._dict_to_df(constraints, columns_to_keep = ['id', 'type', 'match_start', 'match_end', 'pattern', 'level', 'context_start', 'context_end'])
+
+    #     # Create the idx_map dictionary
+    #     idx_map = {old_idx: old_idx for old_idx in constraints_df.index}
+        
+    #     # Creating connector patterns
+    #     patterns = {}
+    #     for phrase in self.parameters["connectors"].keys():
+    #         phrase_pattern = [{"LOWER": word} for word in phrase.split()]
+    #         patterns[phrase.upper().replace(" ", "_")] = phrase_pattern
+
+    #     # Matching patterns
+    #     matcher = Matcher(self.nlp.vocab)
+    #     for key, pattern in patterns.items():
+    #         matcher.add(key, [pattern])
+        
+    #     doc = self.nlp(text)
+    #     matches = matcher(doc)
+
+    #     for match_id, start, end in matches:
+
+    #         subset_idx_left = constraints_df[(constraints_df['match_end'] <= start) & (constraints_df['context_end'] >= end)].index
+
+    #         subset_idx_right = constraints_df[(constraints_df['match_start'] >= end)].index
+
+    #         # Check if subset_idx_left is not empty, then find the index for which the corresponding match_end is the highest
+    #         if not subset_idx_left.empty:
+    #             max_end_idx = constraints_df.loc[subset_idx_left, 'match_end'].idxmax()
+    #             if max_end_idx in subset_idx_left:
+    #                 left_idx = max_end_idx
+    #             else:
+    #                 left_idx = None
+    #         else:
+    #             left_idx = None
+
+    #         # Check if subset_idx_right is not empty, then find the index for which the corresponding match_start is the lowest
+    #         if not subset_idx_right.empty:
+    #             min_start_idx = constraints_df.loc[subset_idx_right, 'match_start'].idxmin()
+    #             if min_start_idx in subset_idx_right:
+    #                 right_idx = min_start_idx
+    #             else:
+    #                 right_idx = None
+    #         else:
+    #             right_idx = None
+
+    #         # Check if both left_idx and right_idx are not None
+    #         if left_idx is not None and right_idx is not None:
+    #             new_idx = idx_map[left_idx] + 1
+
+
+    #             # Insert new list element at position after new_idx
+    #             new_element = {'id': 99, 'type': self.type, 'match': (start, end - 1), 'pattern': 'CONNECTOR_' + self.nlp.vocab.strings[match_id], 'exception': False, 'level': self.empty, 'predecessor': (left_idx, self.parameters["connectors"][self.nlp.vocab.strings[match_id].lower().replace("_", " ")]), 'successor': (right_idx, self.parameters["connectors"][self.nlp.vocab.strings[match_id].lower().replace("_", " ")]), 'context': (constraints_df.at[left_idx, 'context_start'], constraints_df.at[right_idx, 'context_end'])}
+
+    #             for key in constraints.keys():
+    #                 if key in new_element.keys():
+    #                     value = new_element[key]
+    #                 else:
+    #                     value = self.empty
+    #                 constraints[key].insert(new_idx+1, value)
+
+    #             # Update idx_map
+    #             for key, value in idx_map.items():
+    #                 if value > new_idx:
+    #                     idx_map[key] = value + 1
+
+    #     # If any constraints were added
+    #     if len(constraints['id']) != org_len:
+
+    #         # Update the IDs to match the new structure
+    #         last_id = first_id + len(constraints['id']) - 1
+    #         constraints['id'] = list(range(first_id, last_id + 1))
+
+    #         id = last_id + 1
+
+    #         # Update predecessor and successor IDs
+    #         for i in range(len(constraints['predecessor'])):
+    #             constraints['predecessor'][i] = (constraints['id'][i]-1, constraints['predecessor'][i][1])
+
+    #         for i in range(len(constraints['successor'])):
+    #             constraints['successor'][i] = (constraints['id'][i]+1, constraints['successor'][i][1])
+
+    #     return constraints, id
 
 def search_constraints(nlp, text, equality_params, inequality_params, meta_params, enumeration_summary, linebreaks, id=1, verbose=True):
     """
@@ -773,7 +897,8 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
     if len(constraints['id']):
         constraints = meta.determine_context(text, constraints, linebreaks)
         constraints, id = meta.insert_bool(constraints, id)
-        # constraints, id = meta.rank_and_connect(text, constraints, id)
+        constraints, id = meta.insert_connections(text, constraints, id)
+        # constraints, id = meta.rank_and_sort(constraints, id)
     
     # Combine matches, types, negations for visualisation
     combined_negations = []
@@ -782,7 +907,7 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
 
     if verbose:
         # Highlight text
-        ConstraintSearcher(nlp, equality_params).highlight_matches(text, constraints['match'], combined_negations, constraints['type'])
+        ConstraintSearcher(nlp, equality_params).highlight_matches(text, constraints['match'], combined_negations, constraints['type'], constraints['pattern'])
 
         # Print in tabular format
         combined_table_data = zip(*constraints.values()) 
