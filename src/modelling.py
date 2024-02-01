@@ -723,15 +723,17 @@ class MetaConstraintSearcher(ConstraintSearcher):
         first_id = constraints['id'][0]
 
         # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
-        constraints_df = self._dict_to_df(constraints)
+        constraints_df = self._dict_to_df(constraints, columns_to_keep = ['id', 'type', 'match_start', 'match_end', 'pattern', 'level', 'context_start', 'context_end'])
 
         # Create the idx_map dictionary
         idx_map = {old_idx: old_idx for old_idx in constraints_df.index}
 
+        new_elements = []
+
         # Iterate over rows of DataFrame
         for index, row in constraints_df.iterrows():
-
-           if any(x in row['pattern'] for x in ['ENUM', 'FOR_', 'IF_']):
+            
+            if any(x in row['pattern'] for x in ['ENUM', 'FOR_', 'IF_']):
                 # Check for encommpassed, non-connector constraints 
                 subset_indices = constraints_df[(constraints_df['match_start'] > row['match_start']) & (constraints_df['match_end'] < row['match_end']) & (~constraints_df['pattern'].str.contains("CONNECTOR"))].index
                 # If no constraint found within an enumeration item, make it a boolean one
@@ -751,7 +753,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
                         match_end = tmp
 
                     # Insert new list element at position after new_idx
-                    new_element = {'id': 99, 'type': self.type, 'match': (match_start, match_end), 'pattern': 'BOOL', 'exception': False, 'symbol': "==",'level': constraints['level'][new_idx], 'predecessor': (98, self.con_follow), 'successor': (100, self.con_follow), 'context': (match_start, match_end)}
+                    new_element = {'id': 99, 'type': self.type, 'match': (match_start, match_end), 'pattern': 'BOOL', 'exception': False, 'symbol': "==",'level': self.empty, 'predecessor': (98, self.con_follow), 'successor': (100, self.con_follow), 'context': (match_start, match_end)}
                     for key in constraints.keys():
                         if key in new_element.keys():
                             value = new_element[key]
@@ -763,6 +765,39 @@ class MetaConstraintSearcher(ConstraintSearcher):
                     for key, value in idx_map.items():
                         if value > new_idx:
                             idx_map[key] = value + 1
+            
+            # Adding boolean constraints after a for/if constraint
+            if any(x in row['pattern'] for x in ['FOR_', 'IF_']):
+                match_start_bool = row['match_end'] + 1
+                # Find the closest match_start greater than match_start_bool
+                potential_starts = constraints_df[(constraints_df['match_start'] > match_start_bool)]['match_start']
+                potential_starts_meta = constraints_df[(constraints_df['match_start'] > match_start_bool) & (constraints_df['type'] == 'META')]['match_start']
+
+                if not potential_starts_meta.empty:
+                    match_end_bool = potential_starts_meta.min() - 1
+                elif potential_starts.empty:
+                    match_end_bool = row['context_end']
+                else:
+                    match_end_bool = None
+
+                if match_end_bool and match_start_bool <= match_end_bool:
+                    # Generate new BOOL constraint
+                    new_element = {'id': 99, 'type': self.type, 'match': (match_start_bool, match_end_bool), 'pattern': 'BOOL', 'exception': False, 'symbol': "==",'level': self.empty, 'predecessor': (98, self.con_follow), 'successor': (100, self.con_follow), 'context': (match_start_bool, match_end_bool)}
+                    new_elements.append((index, new_element))
+
+        # Insert new BOOL constraints
+        for index, new_element in sorted(new_elements, key=lambda x: x[0], reverse=True):
+            new_idx = idx_map[index] + 1
+            for key in constraints:
+                if key in new_element:
+                    constraints[key].insert(new_idx, new_element[key])
+                else:
+                    constraints[key].insert(new_idx, self.empty)
+
+            # Update idx_map for subsequent inserts
+            for key, value in idx_map.items():
+                if value >= new_idx:
+                    idx_map[key] = value + 1
 
         # If any constraints were added
         if len(constraints['id']) != org_len:
