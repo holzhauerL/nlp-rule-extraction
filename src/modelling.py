@@ -133,7 +133,7 @@ class ConstraintSearcher:
             else:
                 combined.append((match[0], match[1] + 1, 'match', mtype, pattern))
 
-        combined.extend([(negation, negation + 1, 'negation', None, pattern) for negation in negations])
+        combined.extend([(negation, negation + 1, 'negation', None, None) for negation in negations])
         combined.sort(key=lambda x: x[0])
 
         for start, end, type, mtype, pattern in combined:
@@ -522,7 +522,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
         :param text: The text to search within for constraints.
         :param constraints: A dictionary with detailed information about the found constraints.
         :param linebreaks: Boolean array indicating line breaks after each token.
-        :return constraints: The input dictionary, enhanced with context.
+        :return: The input dictionary, enhanced with context.
         """
         doc = self.nlp(text)
         doc_start = 0
@@ -594,14 +594,12 @@ class MetaConstraintSearcher(ConstraintSearcher):
 
         return constraints
 
-    def insert_bool(self, constraints, id):
+    def insert_bool(self, constraints):
         """
         Inserts constraints of type 'BOOL' into existing constraints dictionary.
         
-        :param constraints: A dictionary with detailed information about the found constraints. 
-        :param id: The ID of the last match in the text before this method was called.
-        :return constraints: A dictionary with the inserted 'BOOL' constraints.
-        :return id: The ID of the last match in the text after this method was called.
+        :param constraints: A dictionary with detailed information about the found constraints.
+        :return: A dictionary with the inserted 'BOOL' constraints.
         """
         # Safe parameters for later
         org_len = len(constraints['id'])
@@ -655,8 +653,6 @@ class MetaConstraintSearcher(ConstraintSearcher):
             last_id = first_id + len(constraints['id']) - 1
             constraints['id'] = list(range(first_id, last_id + 1))
 
-            id = last_id + 1
-
             # Update predecessor and successor IDs
             for i in range(len(constraints['predecessor'])):
                 constraints['predecessor'][i] = (constraints['id'][i]-1, constraints['predecessor'][i][1])
@@ -664,17 +660,15 @@ class MetaConstraintSearcher(ConstraintSearcher):
             for i in range(len(constraints['successor'])):
                 constraints['successor'][i] = (constraints['id'][i]+1, constraints['successor'][i][1])
 
-        return constraints, id
+        return constraints
     
-    def insert_connections(self, text, constraints, id):
+    def insert_connections(self, text, constraints):
         """
         Searches and inserts connections in between constraints.
         
         :param text: The text to search within for constraints.
-        :param constraints: A dictionary with detailed information about the found constraints. 
-        :param id: The ID of the last match in the text before this method was called.
-        :return constraints: A dictionary with detailed information about the ranked and connected constraints. 
-        :return id: The ID of the last match in the text after this method was called.
+        :param constraints: A dictionary with detailed information about the found constraints.
+        :return: A dictionary with detailed information about the ranked and connected constraints.
         """
         # Safe parameters for later
         org_len = len(constraints['id'])
@@ -776,8 +770,6 @@ class MetaConstraintSearcher(ConstraintSearcher):
             last_id = first_id + len(constraints['id']) - 1
             constraints['id'] = list(range(first_id, last_id + 1))
 
-            id = last_id + 1
-
             # Update predecessor and successor IDs
             for i in range(len(constraints['predecessor'])):
                 constraints['predecessor'][i] = (constraints['id'][i]-1, constraints['predecessor'][i][1])
@@ -785,103 +777,63 @@ class MetaConstraintSearcher(ConstraintSearcher):
             for i in range(len(constraints['successor'])):
                 constraints['successor'][i] = (constraints['id'][i]+1, constraints['successor'][i][1])
 
-        return constraints, id
+        return constraints
     
-    # def rank_and_sort(self, constraints):
-    #     """
-    #     Ranks and sorts the constraints.
+    def sort_and_prune(self, constraints):
+        """
+        Sorts and prunes the constraints.
         
-    #     :param constraints: A dictionary with detailed information about the found constraints.
-    #     :return constraints: A dictionary with detailed information about the ranked and sorted constraints. 
-    #     :return id: The ID of the last match in the text after this method was called.
-    #     """
-    #     # Safe parameters for later
-    #     org_len = len(constraints['id'])
-    #     first_id = constraints['id'][0]
+        :param constraints: A dictionary with detailed information about the found constraints.
+        :return: A dictionary with detailed information about the sorted and pruned constraints.
+        """
+        # Safe parameters for later
+        org_len = len(constraints['id'])
+        first_id = constraints['id'][0]
 
-    #     # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
-    #     constraints_df = self._dict_to_df(constraints, columns_to_keep = ['id', 'type', 'match_start', 'match_end', 'pattern', 'level', 'context_start', 'context_end'])
-
-    #     # Create the idx_map dictionary
-    #     idx_map = {old_idx: old_idx for old_idx in constraints_df.index}
+        # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
+        constraints_df = self._dict_to_df(constraints, columns_to_keep = ['id', 'type', 'match_start', 'match_end', 'pattern', 'level', 'context_start', 'context_end'])
         
-    #     # Creating connector patterns
-    #     patterns = {}
-    #     for phrase in self.parameters["connectors"].keys():
-    #         phrase_pattern = [{"LOWER": word} for word in phrase.split()]
-    #         patterns[phrase.upper().replace(" ", "_")] = phrase_pattern
+        # Sort the constraints by match_start in ascending order
+        constraints_df.sort_values(by='match_start', inplace=True)
 
-    #     # Matching patterns
-    #     matcher = Matcher(self.nlp.vocab)
-    #     for key, pattern in patterns.items():
-    #         matcher.add(key, [pattern])
+        # Dropping constraints based on specified conditions
+        rows_to_drop = []
+        for index, row in constraints_df.iterrows():
+
+            # If it is a 'FOR' or 'IF' constraint and there are no enumeration constraints in this chunk 
+            if any(x in row['pattern'] for x in ['FOR_', 'IF_']) and not (constraints_df['pattern'].str.contains("ENUM").any()):
+                # Check if there are no 'EQ' or 'INEQ' constraints within the context (incl. the borders) 
+                subset_df = constraints_df[(constraints_df['match_start'] >= row['context_start']) & (constraints_df['match_start'] <= row['context_end']) & (constraints_df['type'] != 'META') & (~constraints_df.index.isin([index]))]
+                if subset_df.empty:
+                    rows_to_drop.append(index)
+                    # Find encompassed BOOL constraints to drop
+                    bool_indices = constraints_df[(constraints_df['pattern'] == 'BOOL') & (constraints_df['match_end'] <= row['match_end']) & (constraints_df['match_start'] >= row['match_start'])].index
+                    rows_to_drop.extend(bool_indices)
+                    print("REMOVED FOR/IF CONSTRAINT:", index)
+                    print("REMOVED BOOL CONSTRAINT:", bool_indices)
+                    
+            
+            if row['type'] == 'EQ':
+                # Check for following 'INEQ' constraints with a matching context_end to match_start
+                matching_ineq_indices = constraints_df[(constraints_df['type'] == 'INEQ') & (constraints_df['match_start'] == row['context_end'])].index
+                if not matching_ineq_indices.empty:
+                    rows_to_drop.append(index)
+                    print("REMOVED EQ CONSTRAINT:", index)
         
-    #     doc = self.nlp(text)
-    #     matches = matcher(doc)
+        # Drop the identified rows
+        constraints_df = constraints_df.drop(rows_to_drop)
 
-    #     for match_id, start, end in matches:
+        # Reassign the 'id' starting from the original first id and increment by 1
+        new_id_start = first_id
+        constraints_df['id'] = range(new_id_start, new_id_start + len(constraints_df))
+        
+        for key in constraints:
+            if key in constraints_df:  # To handle keys that are columns in the DataFrame
+                constraints[key] = list(constraints_df[key])
+            else:  # For keys not in the DataFrame, retain original order (if applicable)
+                constraints[key] = [constraints[key][idx] for idx in constraints_df.index]
 
-    #         subset_idx_left = constraints_df[(constraints_df['match_end'] <= start) & (constraints_df['context_end'] >= end)].index
-
-    #         subset_idx_right = constraints_df[(constraints_df['match_start'] >= end)].index
-
-    #         # Check if subset_idx_left is not empty, then find the index for which the corresponding match_end is the highest
-    #         if not subset_idx_left.empty:
-    #             max_end_idx = constraints_df.loc[subset_idx_left, 'match_end'].idxmax()
-    #             if max_end_idx in subset_idx_left:
-    #                 left_idx = max_end_idx
-    #             else:
-    #                 left_idx = None
-    #         else:
-    #             left_idx = None
-
-    #         # Check if subset_idx_right is not empty, then find the index for which the corresponding match_start is the lowest
-    #         if not subset_idx_right.empty:
-    #             min_start_idx = constraints_df.loc[subset_idx_right, 'match_start'].idxmin()
-    #             if min_start_idx in subset_idx_right:
-    #                 right_idx = min_start_idx
-    #             else:
-    #                 right_idx = None
-    #         else:
-    #             right_idx = None
-
-    #         # Check if both left_idx and right_idx are not None
-    #         if left_idx is not None and right_idx is not None:
-    #             new_idx = idx_map[left_idx] + 1
-
-
-    #             # Insert new list element at position after new_idx
-    #             new_element = {'id': 99, 'type': self.type, 'match': (start, end - 1), 'pattern': 'CONNECTOR_' + self.nlp.vocab.strings[match_id], 'exception': False, 'level': self.empty, 'predecessor': (left_idx, self.parameters["connectors"][self.nlp.vocab.strings[match_id].lower().replace("_", " ")]), 'successor': (right_idx, self.parameters["connectors"][self.nlp.vocab.strings[match_id].lower().replace("_", " ")]), 'context': (constraints_df.at[left_idx, 'context_start'], constraints_df.at[right_idx, 'context_end'])}
-
-    #             for key in constraints.keys():
-    #                 if key in new_element.keys():
-    #                     value = new_element[key]
-    #                 else:
-    #                     value = self.empty
-    #                 constraints[key].insert(new_idx+1, value)
-
-    #             # Update idx_map
-    #             for key, value in idx_map.items():
-    #                 if value > new_idx:
-    #                     idx_map[key] = value + 1
-
-    #     # If any constraints were added
-    #     if len(constraints['id']) != org_len:
-
-    #         # Update the IDs to match the new structure
-    #         last_id = first_id + len(constraints['id']) - 1
-    #         constraints['id'] = list(range(first_id, last_id + 1))
-
-    #         id = last_id + 1
-
-    #         # Update predecessor and successor IDs
-    #         for i in range(len(constraints['predecessor'])):
-    #             constraints['predecessor'][i] = (constraints['id'][i]-1, constraints['predecessor'][i][1])
-
-    #         for i in range(len(constraints['successor'])):
-    #             constraints['successor'][i] = (constraints['id'][i]+1, constraints['successor'][i][1])
-
-    #     return constraints, id
+        return constraints
 
 def search_constraints(nlp, text, equality_params, inequality_params, meta_params, enumeration_summary, linebreaks, id=1, verbose=True):
     """
@@ -907,6 +859,7 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
     meta = MetaConstraintSearcher(nlp, meta_params)
 
     searchers = [inequality, equality, meta]
+    first_id = id
 
     # Perform the searches and combine match details
     id = inequality.search_matches(text, id)
@@ -923,10 +876,14 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
     # If constraints where found, first determine context, then insert 'BOOL' constraints, then rank and connect the constraints
     if len(constraints['id']):
         constraints = meta.determine_context(text, constraints, linebreaks)
-        constraints, id = meta.insert_bool(constraints, id)
-        constraints, id = meta.insert_connections(text, constraints, id)
-        # constraints, id = meta.rank_and_sort(constraints, id)
-    
+        constraints = meta.insert_bool(constraints)
+        constraints = meta.insert_connections(text, constraints)
+        constraints = meta.sort_and_prune(constraints)
+        if len(constraints['id']):
+            id = constraints['id'][-1] + 1
+        else: # If all constraints removed, reset id
+            id = first_id
+
     # Combine matches, types, negations for visualisation
     combined_negations = []
     for s in searchers:
