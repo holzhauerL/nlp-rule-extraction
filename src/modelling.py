@@ -593,74 +593,6 @@ class MetaConstraintSearcher(ConstraintSearcher):
             constraints['context'][index] = (context_start, context_end)
 
         return constraints
-
-    def insert_bool(self, constraints):
-        """
-        Inserts constraints of type 'BOOL' into existing constraints dictionary.
-        
-        :param constraints: A dictionary with detailed information about the found constraints.
-        :return: A dictionary with the inserted 'BOOL' constraints.
-        """
-        # Safe parameters for later
-        org_len = len(constraints['id'])
-        first_id = constraints['id'][0]
-
-        # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
-        constraints_df = self._dict_to_df(constraints)
-
-        # Create the idx_map dictionary
-        idx_map = {old_idx: old_idx for old_idx in constraints_df.index}
-
-        # Iterate over rows of DataFrame
-        for index, row in constraints_df.iterrows():
-
-           if any(x in row['pattern'] for x in ['ENUM', 'FOR_', 'IF_']):
-                subset_indices = constraints_df[(constraints_df['match_start'] > row['match_start']) & (constraints_df['match_end'] < row['match_end'])].index
-                # If no constraint found within an enumeration item, make it a boolean one
-                if len(subset_indices) == 0:
-                    new_idx = idx_map[index]
-                    if 'ENUM' in row['pattern']:
-                        ((x,y),z) = constraints['match'][new_idx]
-                    else:
-                        y,z = constraints['match'][new_idx]
-                    
-                    match_start = y + 1
-                    match_end = z - 1
-
-                    if match_start > match_end:
-                        tmp = match_start
-                        match_start = match_end
-                        match_end = tmp
-
-                    # Insert new list element at position after new_idx
-                    new_element = {'id': 99, 'type': self.type, 'match': (match_start, match_end), 'pattern': 'BOOL', 'exception': False, 'symbol': "==",'level': constraints['level'][new_idx], 'predecessor': (98, self.con_follow), 'successor': (100, self.con_follow), 'context': (match_start, match_end)}
-                    for key in constraints.keys():
-                        if key in new_element.keys():
-                            value = new_element[key]
-                        else:
-                            value = self.empty
-                        constraints[key].insert(new_idx+1, value)
-
-                    # Update idx_map
-                    for key, value in idx_map.items():
-                        if value > new_idx:
-                            idx_map[key] = value + 1
-
-        # If any constraints were added
-        if len(constraints['id']) != org_len:
-
-            # Update the IDs to match the new structure
-            last_id = first_id + len(constraints['id']) - 1
-            constraints['id'] = list(range(first_id, last_id + 1))
-
-            # Update predecessor and successor IDs
-            for i in range(len(constraints['predecessor'])):
-                constraints['predecessor'][i] = (constraints['id'][i]-1, constraints['predecessor'][i][1])
-
-            for i in range(len(constraints['successor'])):
-                constraints['successor'][i] = (constraints['id'][i]+1, constraints['successor'][i][1])
-
-        return constraints
     
     def insert_connections(self, text, constraints):
         """
@@ -778,6 +710,75 @@ class MetaConstraintSearcher(ConstraintSearcher):
                 constraints['successor'][i] = (constraints['id'][i]+1, constraints['successor'][i][1])
 
         return constraints
+
+    def insert_bool(self, constraints):
+        """
+        Inserts constraints of type 'BOOL' into existing constraints dictionary.
+        
+        :param constraints: A dictionary with detailed information about the found constraints.
+        :return: A dictionary with the inserted 'BOOL' constraints.
+        """
+        # Safe parameters for later
+        org_len = len(constraints['id'])
+        first_id = constraints['id'][0]
+
+        # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
+        constraints_df = self._dict_to_df(constraints)
+
+        # Create the idx_map dictionary
+        idx_map = {old_idx: old_idx for old_idx in constraints_df.index}
+
+        # Iterate over rows of DataFrame
+        for index, row in constraints_df.iterrows():
+
+           if any(x in row['pattern'] for x in ['ENUM', 'FOR_', 'IF_']):
+                # Check for encommpassed, non-connector constraints 
+                subset_indices = constraints_df[(constraints_df['match_start'] > row['match_start']) & (constraints_df['match_end'] < row['match_end']) & (~constraints_df['pattern'].str.contains("CONNECTOR"))].index
+                # If no constraint found within an enumeration item, make it a boolean one
+                if len(subset_indices) == 0:
+                    new_idx = idx_map[index]
+                    if 'ENUM' in row['pattern']:
+                        ((x,y),z) = constraints['match'][new_idx]
+                    else:
+                        y,z = constraints['match'][new_idx]
+                    
+                    match_start = y + 1
+                    match_end = z - 1
+
+                    if match_start > match_end:
+                        tmp = match_start
+                        match_start = match_end
+                        match_end = tmp
+
+                    # Insert new list element at position after new_idx
+                    new_element = {'id': 99, 'type': self.type, 'match': (match_start, match_end), 'pattern': 'BOOL', 'exception': False, 'symbol': "==",'level': constraints['level'][new_idx], 'predecessor': (98, self.con_follow), 'successor': (100, self.con_follow), 'context': (match_start, match_end)}
+                    for key in constraints.keys():
+                        if key in new_element.keys():
+                            value = new_element[key]
+                        else:
+                            value = self.empty
+                        constraints[key].insert(new_idx+1, value)
+
+                    # Update idx_map
+                    for key, value in idx_map.items():
+                        if value > new_idx:
+                            idx_map[key] = value + 1
+
+        # If any constraints were added
+        if len(constraints['id']) != org_len:
+
+            # Update the IDs to match the new structure
+            last_id = first_id + len(constraints['id']) - 1
+            constraints['id'] = list(range(first_id, last_id + 1))
+
+            # Update predecessor and successor IDs
+            for i in range(len(constraints['predecessor'])):
+                constraints['predecessor'][i] = (constraints['id'][i]-1, constraints['predecessor'][i][1])
+
+            for i in range(len(constraints['successor'])):
+                constraints['successor'][i] = (constraints['id'][i]+1, constraints['successor'][i][1])
+
+        return constraints
     
     def sort_and_prune(self, constraints):
         """
@@ -812,7 +813,6 @@ class MetaConstraintSearcher(ConstraintSearcher):
                     print("REMOVED FOR/IF CONSTRAINT:", index)
                     print("REMOVED BOOL CONSTRAINT:", bool_indices)
                     
-            
             if row['type'] == 'EQ':
                 # Check for following 'INEQ' constraints with a matching context_end to match_start
                 matching_ineq_indices = constraints_df[(constraints_df['type'] == 'INEQ') & (constraints_df['match_start'] == row['context_end'])].index
@@ -876,8 +876,8 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
     # If constraints where found, first determine context, then insert 'BOOL' constraints, then rank and connect the constraints
     if len(constraints['id']):
         constraints = meta.determine_context(text, constraints, linebreaks)
-        constraints = meta.insert_bool(constraints)
         constraints = meta.insert_connections(text, constraints)
+        constraints = meta.insert_bool(constraints)
         constraints = meta.sort_and_prune(constraints)
         if len(constraints['id']):
             id = constraints['id'][-1] + 1
