@@ -1,4 +1,4 @@
-import copy
+import random
 from spacy.matcher import Matcher
 from termcolor import colored
 from tabulate import tabulate
@@ -494,7 +494,6 @@ class MetaConstraintSearcher(ConstraintSearcher):
         """
         constraints_df = pd.DataFrame.from_dict(constraints)
 
-
         if 'match_start' in columns_to_keep:
             constraints_df['match_start'] = constraints_df['match'].apply(lambda x: x[0][0] if isinstance(x[0], tuple) else x[0]).astype(int)
         
@@ -594,6 +593,28 @@ class MetaConstraintSearcher(ConstraintSearcher):
 
         return constraints
     
+    def _update_ids(self, constraints, first_id):
+        """ 
+        Updates the ids in 'id', 'predecessor' and 'successor' fields of the constraints dict.
+
+        :param constraints: A dictionary with detailed information about the found constraints.
+        :param first_id: The id to start with.
+        :return: A dictionary with detailed information about the updated constraints.
+        """
+
+        # Update the IDs to match the new structure
+        last_id = first_id + len(constraints['id']) - 1
+        constraints['id'] = list(range(first_id, last_id + 1))
+
+        # Update predecessor and successor IDs
+        for i in range(len(constraints['predecessor'])):
+            constraints['predecessor'][i] = (constraints['id'][i]-1, constraints['predecessor'][i][1])
+
+        for i in range(len(constraints['successor'])):
+            constraints['successor'][i] = (constraints['id'][i]+1, constraints['successor'][i][1])
+        
+        return constraints
+    
     def insert_connections(self, text, constraints):
         """
         Searches and inserts connections in between constraints.
@@ -602,8 +623,6 @@ class MetaConstraintSearcher(ConstraintSearcher):
         :param constraints: A dictionary with detailed information about the found constraints.
         :return: A dictionary with detailed information about the ranked and connected constraints.
         """
-        # Safe parameters for later
-        org_len = len(constraints['id'])
         first_id = constraints['id'][0]
 
         # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
@@ -695,21 +714,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
                     if value > new_idx:
                         idx_map[key] = value + 1
 
-        # If any constraints were added
-        if len(constraints['id']) != org_len:
-
-            # Update the IDs to match the new structure
-            last_id = first_id + len(constraints['id']) - 1
-            constraints['id'] = list(range(first_id, last_id + 1))
-
-            # Update predecessor and successor IDs
-            for i in range(len(constraints['predecessor'])):
-                constraints['predecessor'][i] = (constraints['id'][i]-1, constraints['predecessor'][i][1])
-
-            for i in range(len(constraints['successor'])):
-                constraints['successor'][i] = (constraints['id'][i]+1, constraints['successor'][i][1])
-
-        return constraints
+        return self._update_ids(constraints, first_id)
 
     def insert_bool(self, constraints):
         """
@@ -718,8 +723,6 @@ class MetaConstraintSearcher(ConstraintSearcher):
         :param constraints: A dictionary with detailed information about the found constraints.
         :return: A dictionary with the inserted 'BOOL' constraints.
         """
-        # Safe parameters for later
-        org_len = len(constraints['id'])
         first_id = constraints['id'][0]
 
         # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
@@ -799,21 +802,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
                 if value >= new_idx:
                     idx_map[key] = value + 1
 
-        # If any constraints were added
-        if len(constraints['id']) != org_len:
-
-            # Update the IDs to match the new structure
-            last_id = first_id + len(constraints['id']) - 1
-            constraints['id'] = list(range(first_id, last_id + 1))
-
-            # Update predecessor and successor IDs
-            for i in range(len(constraints['predecessor'])):
-                constraints['predecessor'][i] = (constraints['id'][i]-1, constraints['predecessor'][i][1])
-
-            for i in range(len(constraints['successor'])):
-                constraints['successor'][i] = (constraints['id'][i]+1, constraints['successor'][i][1])
-
-        return constraints
+        return self._update_ids(constraints, first_id)
     
     def sort_and_prune(self, constraints):
         """
@@ -822,8 +811,6 @@ class MetaConstraintSearcher(ConstraintSearcher):
         :param constraints: A dictionary with detailed information about the found constraints.
         :return: A dictionary with detailed information about the sorted and pruned constraints.
         """
-        # Safe parameters for later
-        org_len = len(constraints['id'])
         first_id = constraints['id'][0]
 
         # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
@@ -843,24 +830,39 @@ class MetaConstraintSearcher(ConstraintSearcher):
                 if subset_df.empty:
                     rows_to_drop.append(index)
                     # Find encompassed BOOL constraints to drop
-                    bool_indices = constraints_df[(constraints_df['pattern'] == 'BOOL') & (constraints_df['match_end'] <= row['match_end']) & (constraints_df['match_start'] >= row['match_start'])].index
+                    bool_indices = constraints_df[(constraints_df['pattern'] == 'BOOL') & (constraints_df['match_end'] <= row['context_end']) & (constraints_df['match_start'] >= row['context_start'])].index
                     rows_to_drop.extend(bool_indices)
-                    print("REMOVED FOR/IF CONSTRAINT:", index)
-                    print("REMOVED BOOL CONSTRAINT:", bool_indices)
                     
             if row['type'] == 'EQ':
                 # Check for following 'INEQ' constraints with a matching context_end to match_start
                 matching_ineq_indices = constraints_df[(constraints_df['type'] == 'INEQ') & (constraints_df['match_start'] == row['context_end'])].index
                 if not matching_ineq_indices.empty:
                     rows_to_drop.append(index)
-                    print("REMOVED EQ CONSTRAINT:", index)
         
         # Drop the identified rows
         constraints_df = constraints_df.drop(rows_to_drop)
 
-        # Reassign the 'id' starting from the original first id and increment by 1
-        new_id_start = first_id
-        constraints_df['id'] = range(new_id_start, new_id_start + len(constraints_df))
+        # Identify duplicates based on 'pattern', 'match_start', and 'match_end'
+        duplicate_rows = constraints_df.duplicated(subset=['pattern', 'match_start', 'match_end'], keep='first')
+
+        # Drop the identified duplicate rows
+        constraints_df = constraints_df[~duplicate_rows]
+
+        # Drop two subsequent 'CONNECTOR_AND' constraints
+        previous_was_connector = False
+        connector_rows_to_drop = []
+        for index, row in constraints_df.iterrows():
+            if row['pattern'] == 'CONNECTOR_AND':
+                if previous_was_connector:
+                    connector_rows_to_drop.append(index - 1)
+                    connector_rows_to_drop.append(index)
+                    print("REMOVED CONNECTOR:", index)
+                previous_was_connector = True
+            else:
+                previous_was_connector = False
+
+        # Drop the marked 'CONNECTOR' constraints
+        constraints_df = constraints_df.drop(connector_rows_to_drop)
         
         for key in constraints:
             if key in constraints_df:  # To handle keys that are columns in the DataFrame
@@ -868,15 +870,73 @@ class MetaConstraintSearcher(ConstraintSearcher):
             else:  # For keys not in the DataFrame, retain original order (if applicable)
                 constraints[key] = [constraints[key][idx] for idx in constraints_df.index]
 
-        return constraints
+        return self._update_ids(constraints, first_id)
+    
 
-def search_constraints(nlp, text, equality_params, inequality_params, meta_params, enumeration_summary, linebreaks, id=1, verbose=True):
+class ConstraintBuilder:
     """
-    Conducts a combined search for equality, inequality, and meta (enumeration) constraints within a given text.
+    Class for constraint building based on the constraint items.
+    """
+    def __init__(self, nlp):
+        """
+        Initializes the ConstraintBuilder.
 
-    This function initializes InequalityConstraintSearcher, EqualityConstraintSearcher, and MetaConstraintSearcher, performs the search, and then combines their findings.
+        :param nlp: An instance of a spaCy Language model used for processing text.
+        :param parameters: A dictionary containing various settings and parameters for constraint searching.
+        """
+        self.nlp = nlp
+        self.con_follow = "FOLLOW"
+        self.con_start = "START"
+        self.con_end = "END"
+        self.con_and = "AND"
+        self.con_or = "OR"
+
+    def build(self, text, constraints):
+        """
+        Builds the components for the formatted constraints for the Gold Standard comparison.
+
+        :param text: The text to search within for constraints.
+        :param constraints: A dictionary with detailed information about the found constraints.
+        :return formatted_constraints: An array with the components for the formatted constraints.
+        """
+        random_integer = random.randint(1, 10)
+        formatted_constraints = [(f"STEP_{random_integer}", "CONSTRAINT")]
+
+        return formatted_constraints
+    
+    def streamline(self, formatted_constraints):
+        """
+        Streamlines the constraints into the end format relevant for the Gold Standard comparison.
+
+        :param formatted_constraints: An array with the formatted constraints.
+        :return: The streamlined constraints in a dict.
+        """
+        streamlined = {}
+        counter = 1
+        nr_of_constraints = len(formatted_constraints)
+
+        for i in range(nr_of_constraints):
+
+            step = formatted_constraints[i][0]
+            constraint = formatted_constraints[i][1]
+
+            if i < nr_of_constraints - 1:
+                succeding_step = formatted_constraints[i + 1][0]
+            else:
+                succeding_step = "END"
+            streamlined[f'c{counter}'] = "({" + step + "}, {" + succeding_step + "}, {directly follows}, {" + constraint + "})"
+            counter += 1
+
+        return streamlined
+
+def get_constraints(nlp, builder, text, equality_params, inequality_params, meta_params, enumeration_summary, linebreaks, id=1, verbose=True):
+    """
+    Conducts a combined search for equality, inequality, and meta (enumeration) constraints within a given text and formats the constraints according to the builder.
+
+    This function initializes InequalityConstraintSearcher, EqualityConstraintSearcher, and MetaConstraintSearcher, performs the search, and then combines their findings. It also calls the method to format the constraints.
 
     :param nlp: A spaCy Language model instance used for text processing.
+    :param builder: A ConstraintBuilder instance to format the constraints.
     :param text: The text to search within for constraints.
     :param equality_params: Parameters for the EqualityConstraintSearcher.
     :param inequality_params: Parameters for the InequalityConstraintSearcher.
@@ -888,14 +948,13 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
     :return constraints: A dictionary with detailed information about the found constraints. 
     :return id: The ID of the last match + 1 found by the current function within the document.
     """
+    first_id = id
+    formatted_constraints = []
     # Initialize searchers
     inequality = InequalityConstraintSearcher(nlp, inequality_params)
     equality = EqualityConstraintSearcher(nlp, equality_params)
     meta = MetaConstraintSearcher(nlp, meta_params)
-
-    searchers = [inequality, equality, meta]
-    first_id = id
-
+    
     # Perform the searches and combine match details
     id = inequality.search_matches(text, id)
     id = equality.search_matches(text, id)
@@ -903,7 +962,7 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
     id = meta.search_if_clauses(text, linebreaks, id)
     id = meta.search_for_clauses(text, linebreaks, id)
 
-    # Create output dict
+    # Concatenate findings in output dict
     constraints = {}
     for key in inequality.constraints.keys():
         constraints[key] = inequality.constraints[key] + equality.constraints[key] + meta.constraints[key]
@@ -914,17 +973,17 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
         constraints = meta.insert_connections(text, constraints)
         constraints = meta.insert_bool(constraints)
         constraints = meta.sort_and_prune(constraints)
+
         if len(constraints['id']):
             id = constraints['id'][-1] + 1
+            # Build constraints
+            formatted_constraints = builder.build(text, constraints)
         else: # If all constraints removed, reset id
             id = first_id
 
-    # Combine matches, types, negations for visualisation
-    combined_negations = []
-    for s in searchers:
-        combined_negations.extend(neg[0] for neg in s.constraints['negation'] if isinstance(neg,tuple))
-
     if verbose:
+        # Unpack negations for visualisation
+        combined_negations = [neg[0] for neg in constraints['negation'] if isinstance(neg, tuple)]
         # Highlight text
         ConstraintSearcher(nlp, equality_params).highlight_matches(text, linebreaks, constraints['match'], combined_negations, constraints['type'], constraints['pattern'])
 
@@ -934,14 +993,19 @@ def search_constraints(nlp, text, equality_params, inequality_params, meta_param
         if any(constraints.values()): 
             print()
             print(tabulate(combined_table_data, headers=constraints.keys()))
+            print()
+            for c in formatted_constraints:
+                print(c)
+
+    constraints['formatted'] = formatted_constraints
 
     return constraints, id
 
-def search_constraints_in_data(nlp, data, equality_params, inequality_params, meta_params, verbose=True):
+def get_constraints_from_data(nlp, data, equality_params, inequality_params, meta_params, verbose=True):
     """
-    Conducts a combined search for inequality, equality and meta constraints for all use cases.
+    Conducts a combined search for inequality, equality and meta constraints and builds the constraints for all use cases.
 
-    Wrapper function for search_constraints(). 
+    Wrapper function for get_constraints(). 
 
     :param nlp: A spaCy Language model instance used for text processing.
     :param data: A dictionary with one dataframe per use case containing pre-processed chunks of text in the 'Lemma' column.  
@@ -951,6 +1015,8 @@ def search_constraints_in_data(nlp, data, equality_params, inequality_params, me
     :param verbose: Parameter to control the printed output. If True, output is printed.
     :return constraints: A dictionary with detailed information about the found constraints. 
     """
+    builder = ConstraintBuilder(nlp)
+
     delimiter_line = "+"*80
     constraints_tmp = defaultdict(lambda: defaultdict(list)) # Enable dict assignment before knowing the keys
 
@@ -970,7 +1036,9 @@ def search_constraints_in_data(nlp, data, equality_params, inequality_params, me
                     print()
                     print("++++ CHUNK ++++", "\n")
 
-                new_constraints, id = search_constraints(nlp, chunk, equality_params, inequality_params, meta_params, row['Enumeration'][chunk_index], row['Linebreak'][chunk_index], id, verbose)
+                # Search for constraints
+                new_constraints, id = get_constraints(nlp, builder, chunk, equality_params, inequality_params, meta_params, row['Enumeration'][chunk_index], row['Linebreak'][chunk_index], id, verbose)
+
                 for key, values in new_constraints.items():
                     constraints_tmp[use_case][key].extend(values)
                     if key == 'id':  # Only append to 'index' and 'chunk' when new 'id' is found
@@ -980,10 +1048,29 @@ def search_constraints_in_data(nlp, data, equality_params, inequality_params, me
         # Overwrite the successor of the last found constraint item to demark the end, if any constraint was found
         if constraints_tmp[use_case]['successor']:
             constraints_tmp[use_case]['successor'][-1] = (constraints_tmp[use_case]['successor'][-1][0],'END')
+        
+        # Streamline process steps and IDs of the formatted constraints
+        constraints_tmp[use_case]['formatted'] = builder.streamline(constraints_tmp[use_case]['formatted'])
+
 
     # Format to regular dict
     constraints = dict()
     for key, value in constraints_tmp.items():
         constraints[key] = dict(value)
+
+    if verbose:
+        print()
+        print(delimiter_line)
+        print(delimiter_line, "\n")
+        print("SUMMARY OF CONSTRAINT ITEMS\n")
+        print(delimiter_line)
+        print(delimiter_line, "\n")
+
+        total_constraint_items = 0
+        for case, c in constraints.items():
+            total_constraint_items += len(c['id'])
+            print(f"{len(c['id'])}", ":" , case)
+        print()
+        print(total_constraint_items, ": TOTAL")
 
     return constraints
