@@ -1,12 +1,11 @@
 import os
 import re
 import pickle
+import numerizer
 from termcolor import colored
 import pandas as pd
-import spacy
 from spacy.matcher import Matcher
 from spacy.lang.en.stop_words import STOP_WORDS
-import numerizer
 
 
 class Preprocessor:
@@ -94,10 +93,10 @@ class Preprocessor:
                 text = text.replace(item, "")
 
         return text
-
-    def chng_stpwrds(self, add=[],remove=[],remove_numbers=False,restore_default=False, default_filename = '_stopwords_en.pickle'):
+    
+    def chng_stpwrds(self, add=[],remove=[],remove_numbers=False,restore_default=False, default_filename = '_stopwords_changes.pickle'):
         """
-        Adds and removes stop words to the default of SpaCy. 
+        Adds and removes stop words to/from the default set in SpaCy, with options to save/restore customizations.
 
         :param add: Stop words to add, e.g. ["by", "the"].
         :param remove: Stop words to remove, e.g. ["to", "one"].
@@ -106,12 +105,9 @@ class Preprocessor:
         :param default_filename: Name of the file with the default stop words. Only relevant if restore_default == True.
         :return: Stop words.
         """
+        pickle_path = os.path.join(os.getcwd(), default_filename)
 
-        if restore_default:
-            default_filepath = os.path.join('..', 'src', default_filename) # works in src and notebooks folder
-            with open(default_filepath, 'rb') as file:
-                cls = pickle.load(file)
-        else:
+        if not restore_default:
             if remove_numbers:
                 stpwrds = sorted(STOP_WORDS)
 
@@ -121,24 +117,41 @@ class Preprocessor:
                         remove.append(item)
                         if self.verbose:
                             print(item, "successfuly added to removal list!")
+            
+            with open(pickle_path, 'wb') as file:
+                pickle.dump({'add': add, 'remove': remove}, file)
+        else:
+            # Restore default by inverting saved additions and removals
+            if os.path.exists(pickle_path):
+                with open(pickle_path, 'rb') as file:
+                    changes = pickle.load(file)
+                # Invert the add and remove lists
+                add, remove = changes['remove'], changes['add']
 
-            cls = spacy.util.get_lang_class('en')
-            # Add
-            for word in add:
-                cls.Defaults.stop_words.add(word)
+                # Delete the file after restoring defaults
+                os.remove(pickle_path)
+                if self.verbose:
+                    print("Restored default stop words and deleted the backup file.")
+            else:
+                if self.verbose:
+                    print("No saved stop words changes to restore.")
+
+        # Add
+        for word in add:
+            self.nlp.Defaults.stop_words.add(word)
+            if self.verbose: 
+                print("Stop word [", word, "] successfully added!")
+        # Remove
+        for word in remove:
+            try:
+                self.nlp.Defaults.stop_words.remove(word)
                 if self.verbose: 
-                    print("Stop word [", word, "] successfully added!")
-            # Remove
-            for word in remove:
-                try:
-                    cls.Defaults.stop_words.remove(word)
-                    if self.verbose: 
-                        print("Stop word [", word, "] successfully removed!")  
-                except:
-                    if self.verbose: 
-                        print("Stop word [", word, "] could not be removed because it is not contained in the current set.") 
+                    print("Stop word [", word, "] successfully removed!")  
+            except:
+                if self.verbose: 
+                    print("Stop word [", word, "] could not be removed because it is not contained in the current set.") 
 
-        stpwrds = sorted(STOP_WORDS)
+        stpwrds = sorted(self.nlp.Defaults.stop_words)
         if self.verbose:
             print("\nSTOPWORDS:",len(stpwrds),"\n")
             for word in stpwrds:

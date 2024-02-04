@@ -716,6 +716,31 @@ class MetaConstraintSearcher(ConstraintSearcher):
                         idx_map[key] = value + 1
 
         return self._update_ids(constraints, first_id)
+    
+    def _insert_new_element(self, new_elements, constraints, idx_map):
+        """
+        Helper function to insert a new element into the existing set of constraints and update the index map.
+
+        :param new_elements: Array with the new elements to insert.
+        :param constraints: A dictionary with detailed information about the found constraints.
+        :param idx_map: Mapping the old indices to the new ones.
+        :return constraints: Updated constraints dict.
+        :return idx_map: Updated index map.
+        """
+        # Insert new BOOL constraints
+        for index, new_element in sorted(new_elements, key=lambda x: x[0], reverse=True):
+            new_idx = idx_map[index] + 1
+            for key in constraints:
+                if key in new_element:
+                    constraints[key].insert(new_idx, new_element[key])
+                else:
+                    constraints[key].insert(new_idx, self.empty)
+
+            # Update idx_map for subsequent inserts
+            for key, value in idx_map.items():
+                if value >= new_idx:
+                    idx_map[key] = value + 1
+        return constraints, idx_map
 
     def insert_bool(self, constraints):
         """
@@ -790,18 +815,32 @@ class MetaConstraintSearcher(ConstraintSearcher):
                     new_elements.append((index, new_element))
 
         # Insert new BOOL constraints
-        for index, new_element in sorted(new_elements, key=lambda x: x[0], reverse=True):
-            new_idx = idx_map[index] + 1
-            for key in constraints:
-                if key in new_element:
-                    constraints[key].insert(new_idx, new_element[key])
-                else:
-                    constraints[key].insert(new_idx, self.empty)
+        constraints, idx_map = self._insert_new_element(new_elements, constraints, idx_map)
 
-            # Update idx_map for subsequent inserts
-            for key, value in idx_map.items():
-                if value >= new_idx:
-                    idx_map[key] = value + 1
+        # Recreate the DataFrame with the updated constraints, now also including the added BOOL constraints
+        constraints_df = self._dict_to_df(constraints, columns_to_keep = ['id', 'type', 'match_start', 'match_end', 'pattern', 'level', 'context_start', 'context_end'])
+
+        # Create the idx_map dictionary
+        idx_map = {old_idx: old_idx for old_idx in constraints_df.index}
+
+        new_elements = []
+
+        # Insert addtional BOOL, if CONNECTOR in between
+        for index, row in constraints_df.iterrows():
+
+            if 'CONNECTOR' in row["pattern"]:
+                encompassing_bool_index = constraints_df[(constraints_df['pattern'] == 'BOOL') & (constraints_df['match_start'] < row['match_start']) & (constraints_df['match_end'] > row['match_end'])].index
+
+                if not encompassing_bool_index.empty:
+                    for idx in encompassing_bool_index:
+                        # Generate new BOOL
+                        new_element = {'id': 99, 'type': self.type, 'match': (row['match_end']+1, constraints['match'][idx][1]), 'pattern': 'BOOL', 'exception': False, 'symbol': "==",'level': self.empty, 'predecessor': (98, self.con_follow), 'successor': (100, self.con_follow), 'context': (row['match_end']+1, constraints['match'][idx][1])}
+                        new_elements.append((index, new_element))
+                        # Update match and context for encompassing BOOL (only one entry in index array)
+                        constraints['match'][idx] = constraints['context'][idx] = (constraints['context'][idx][0], row['match_start']-1)
+
+        # Insert new BOOL constraints
+        constraints, idx_map = self._insert_new_element(new_elements, constraints, idx_map)
 
         return self._update_ids(constraints, first_id)
     
@@ -824,6 +863,12 @@ class MetaConstraintSearcher(ConstraintSearcher):
         rows_to_drop = []
         for index, row in constraints_df.iterrows():
 
+            # Check if a 'BOOL' constraint is encompassing a 'EQ' or 'INEQ' constraint
+            if row['pattern'] == 'BOOL':
+                matching_indices = constraints_df[((constraints_df['type'] == 'EQ') | (constraints_df['type'] == 'INEQ')) & (row['match_start'] <= constraints_df['match_start']) &  (row['match_end'] >= constraints_df['match_end'])].index
+                if not matching_indices.empty:
+                    rows_to_drop.append(index)
+
             # If it is a 'FOR' or 'IF' constraint and there are no enumeration constraints in this chunk 
             if any(x in row['pattern'] for x in ['FOR_', 'IF_']) and not (constraints_df['pattern'].str.contains("ENUM").any()):
                 # Check if there are no 'EQ' or 'INEQ' constraints within the context (incl. the borders) 
@@ -833,11 +878,14 @@ class MetaConstraintSearcher(ConstraintSearcher):
                     # Find encompassed BOOL constraints to drop
                     bool_indices = constraints_df[(constraints_df['pattern'] == 'BOOL') & (constraints_df['match_end'] <= row['context_end']) & (constraints_df['match_start'] >= row['context_start'])].index
                     rows_to_drop.extend(bool_indices)
-                    
+
+            # Check for following 'INEQ' constraints with a matching context_end to match_start        
             if row['type'] == 'EQ':
-                # Check for following 'INEQ' constraints with a matching context_end to match_start
                 matching_ineq_indices = constraints_df[(constraints_df['type'] == 'INEQ') & (constraints_df['match_start'] == row['context_end'])].index
                 if not matching_ineq_indices.empty:
+                    # Update context starts for matching INEQ constraints in the original dictionary
+                    for idx in matching_ineq_indices:
+                        constraints['context'][idx] = (row['context_start'], constraints['context'][idx][1])
                     rows_to_drop.append(index)
         
         # Drop the identified rows
@@ -857,7 +905,6 @@ class MetaConstraintSearcher(ConstraintSearcher):
                 if previous_was_connector:
                     connector_rows_to_drop.append(index - 1)
                     connector_rows_to_drop.append(index)
-                    print("REMOVED CONNECTOR:", index)
                 previous_was_connector = True
             else:
                 previous_was_connector = False
@@ -870,6 +917,15 @@ class MetaConstraintSearcher(ConstraintSearcher):
                 constraints[key] = list(constraints_df[key])
             else:  # For keys not in the DataFrame, retain original order (if applicable)
                 constraints[key] = [constraints[key][idx] for idx in constraints_df.index]
+
+        # # Update context for non-encompassed constraints
+        # for index, row in constraints_df.iterrows():
+
+        #     overlapping_end_index = constraints_df[(constraints_df['match_start'] < row['context_end']) & (~(constraints_df['match_start'] > row['match_start']) & (constraints_df['match_end'] < row['match_end']))].index
+
+        #     if not overlapping_end_index.empty:
+        #         overlap_idx = overlapping_end_index.min()
+        #         constraints['context'][index] = (constraints['context'][index][0],constraints_df.at[overlap_idx, 'match_start']-1)
 
         return self._update_ids(constraints, first_id)
     
@@ -891,6 +947,11 @@ class ConstraintBuilder:
         self.con_and = "AND"
         self.con_or = "OR"
 
+
+
+
+
+
     def build(self, text, constraints, verbose=False):
         """
         Builds the components for the formatted constraints for the Gold Standard comparison.
@@ -901,21 +962,54 @@ class ConstraintBuilder:
         :return formatted_constraints: An array with the components for the formatted constraints.
         """
         random_integer = random.randint(1, 10)
-        formatted_constraints = [(f"STEP_{random_integer}", "CONSTRAINT")]
+        formatted_constraints = []
 
-        doc = self.nlp(text)
+        tokens = text.split()
+        stop_words = set(self.nlp.Defaults.stop_words)
+        
+        constraint = "CONSTRAINT"
+        step = f"STEP_{random_integer}"
+        
+        for i in range(len(constraints['id'])):
+            type = constraints['type'][i]
+            exception = constraints['exception'][i]
+            symbol = constraints['symbol'][i]
 
-        if verbose:
-            displacy.render(doc, style='dep', jupyter=True)
-            displacy.render(doc, style='ent', jupyter=True)
+            if type in ['EQ', 'INEQ']:
+                context = constraints['context'][i]
+                # Define the indices to keep in relation to the original set of tokens for this chunk
+                indices = list(range(context[0],context[1]+1))
 
-        # # print(constraints)    
+                match = constraints['match'][i]
 
-        # for i in range(len(constraints['id'])):
-        #     if constraints['type'] == 'EQ':
+                if type == 'INEQ' and not exception:
+                    # Remove the match
+                    for idx in range(match[0], match[1] + 1):
+                        if idx in indices:
+                            indices.remove(idx)
+                    
+                    # The numerical part
+                    right_part = tokens[match[1]]
+                
+                    subset = " ".join([tokens[idx] for idx in indices if tokens[idx] not in stop_words])
+                    
+                    doc = self.nlp(subset)
 
+                    # Remove tokens with POS == 'SYM' or IS_PUNCT == True
+                    filtered_tokens = [token.text for token in doc if token.pos_ != 'SYM' and not token.is_punct]
+
+                    # Construct left_part from filtered tokens
+                    left_part = "_".join(filtered_tokens)
+
+                    constraint = left_part + " " + symbol + " " + right_part
+
+                    displacy.render(doc, style='dep', jupyter=True)
+
+                    formatted_constraints.append((step, constraint))
 
         return formatted_constraints
+
+
     
     def streamline(self, formatted_constraints):
         """
