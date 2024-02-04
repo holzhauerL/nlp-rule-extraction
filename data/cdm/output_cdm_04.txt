@@ -80,4 +80,4 @@ c8 = ({check claimed emission reductions}, {check project design document}, {dir
 
 c9 = ({check project design document}, {check aggregate electricity savings}, {directly follows}, {project_design_document == document_avoidance_of_potential_for_double_counting})
 
-c13 = ({check aggregate electricity savings}, {apply methodolgy}, {directly follows}, {electricity_savings_per_year <= 60})
+c10 = ({check aggregate electricity savings}, {apply methodolgy}, {directly follows}, {electricity_savings_per_year <= 60})

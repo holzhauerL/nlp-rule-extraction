@@ -1,0 +1,99 @@
+\begin{thebibliography}{12}
+\expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
+
+\bibitem[{Brown et~al.(2020)Brown, Mann, Ryder, Subbiah, Kaplan, Dhariwal,
+  Neelakantan, Shyam, Sastry, Askell, Agarwal, Herbert{-}Voss, Krueger,
+  Henighan, Child, Ramesh, Ziegler, Wu, Winter, Hesse, Chen, Sigler, Litwin,
+  Gray, Chess, Clark, Berner, McCandlish, Radford, Sutskever, and
+  Amodei}]{brown:2020}
+Tom~B. Brown, Benjamin Mann, Nick Ryder, Melanie Subbiah, Jared Kaplan,
+  Prafulla Dhariwal, Arvind Neelakantan, Pranav Shyam, Girish Sastry, Amanda
+  Askell, Sandhini Agarwal, Ariel Herbert{-}Voss, Gretchen Krueger, Tom
+  Henighan, Rewon Child, Aditya Ramesh, Daniel~M. Ziegler, Jeffrey Wu, Clemens
+  Winter, Christopher Hesse, Mark Chen, Eric Sigler, Mateusz Litwin, Scott
+  Gray, Benjamin Chess, Jack Clark, Christopher Berner, Sam McCandlish, Alec
+  Radford, Ilya Sutskever, and Dario Amodei. 2020.
+\newblock \href {https://arxiv.org/abs/2005.14165} {Language models are
+  few-shot learners}.
+\newblock \emph{CoRR}, abs/2005.14165.
+
+\bibitem[{Chawla et~al.(2002)Chawla, Bowyer, Hall, and
+  Kegelmeyer}]{chawla:2002}
+N.~V. Chawla, K.W. Bowyer, L.O. Hall, and W.~P. Kegelmeyer. 2002.
+\newblock \href {https://doi.org/10.1613/jair.953} {Smote: Synthetic minority
+  over-sampling technique}.
+\newblock \emph{Journal of Artificial Intelligence Research}, 16:321--357.
+
+\bibitem[{Chen and Guestrin(2016)}]{Chen:2016:XST:2939672.2939785}
+Tianqi Chen and Carlos Guestrin. 2016.
+\newblock \href {https://doi.org/10.1145/2939672.2939785} {{XGBoost}: A
+  scalable tree boosting system}.
+\newblock In \emph{Proceedings of the 22nd ACM SIGKDD International Conference
+  on Knowledge Discovery and Data Mining}, KDD '16, pages 785--794, New York,
+  NY, USA. ACM.
+
+\bibitem[{Cortes and Vapnik(1995)}]{cortes1995support}
+Corinna Cortes and Vladimir Vapnik. 1995.
+\newblock Support-vector networks.
+\newblock \emph{Machine learning}, 20(3):273--297.
+
+\bibitem[{(ESSERIC)(2021)}]{ESS9_data_documentation:2021}
+European Social Survey European Research~Infrastructure (ESSERIC). 2021.
+\newblock \href {https://doi.org/10.21338/NSD-ESS9-2018} {Ess9 data
+  documentation}.
+\newblock \emph{Sikt - Norwegian Agency for Shared Services in Education and
+  Research}.
+
+\bibitem[{European Social Survey European Research
+  Infrastructure~(ESSERIC)(2021)}]{ESS9:2021}
+.~European Social Survey European Research Infrastructure~(ESSERIC). 2021.
+\newblock \href {https://doi.org/10.21338/ESS9E03_1} {Ess9 - integrated file,
+  edition 3.1 [data set]}.
+\newblock \emph{Sikt - Norwegian Agency for Shared Services in Education and
+  Research}.
+
+\bibitem[{Grimmer et~al.(2021)Grimmer, Roberts, and Stewart}]{grimmer:2021}
+Justin Grimmer, Margaret~E. Roberts, and Brandon~M. Stewart. 2021.
+\newblock \href {https://doi.org/10.1146/annurev-polisci-053119-015921}
+  {Machine learning for social science: An agnostic approach}.
+\newblock \emph{Annu. Rev. Polit. Sci.}, 24(1):395--419.
+
+\bibitem[{He et~al.(2008)He, Bai, and Garcia}]{he:2008}
+H.~He, Y.~Bai, and E.A. Garcia. 2008.
+\newblock \href
+  {https://sci2s.ugr.es/keel/pdf/algorithm/congreso/2008-He-ieee.pdf} {Adasyn:
+  Adaptive synthetic sampling approach for imbalanced learning}.
+\newblock \emph{Proceedings of International Joint Conference on Neural
+  Networks}, pages 1322--1328.
+
+\bibitem[{Lundberg and Lee(2017)}]{NIPS2017_7062}
+Scott~M Lundberg and Su-In Lee. 2017.
+\newblock \href
+  {http://papers.nips.cc/paper/7062-a-unified-approach-to-interpreting-model-predictions.pdf}
+  {A unified approach to interpreting model predictions}.
+\newblock In I.~Guyon, U.~V. Luxburg, S.~Bengio, H.~Wallach, R.~Fergus,
+  S.~Vishwanathan, and R.~Garnett, editors, \emph{Advances in Neural
+  Information Processing Systems 30}, pages 4765--4774. Curran Associates, Inc.
+
+\bibitem[{Serrano and Bajo(2019)}]{serrano:2019}
+Emilio Serrano and Javier Bajo. 2019.
+\newblock \href {https://doi.org/https://doi.org/10.1016/j.future.2019.05.034}
+  {Deep neural network architectures for social services diagnosis in smart
+  cities}.
+\newblock \emph{Future Generation Computer Systems}, 100:122--131.
+
+\bibitem[{Serrano et~al.(2019)Serrano, Suárez-Figueroa, González-Pachón, and
+  Gómez-Pérez}]{serrano:2019-2}
+Emilio Serrano, Mari~Carmen Suárez-Figueroa, Jacinto González-Pachón, and
+  Asunción Gómez-Pérez. 2019.
+\newblock \href {https://doi.org/10.1007/s10115-018-1230-x} {Toward proactive
+  social inclusion powered by machine learning}.
+\newblock \emph{Knowledge and Information Systems}, 58(3):651--667.
+
+\bibitem[{Yektansani and Azizi(2021)}]{yektansani:2021}
+Kiana Yektansani and Seyed~Soroosh Azizi. 2021.
+\newblock \href {https://EconPapers.repec.org/RePEc:ags:aaea21:313902} {Using
+  machine learning to predict consumers' environmental attitudes and beliefs}.
+\newblock techreport 313902, Agricultural and Applied Economics Association.
+
+\end{thebibliography}

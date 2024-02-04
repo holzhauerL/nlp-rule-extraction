@@ -1,3 +1,8 @@
+<!--
+	Source:
+		-> Patent Act as published on 16 December 1980 (Federal Law Gazette 1981 I, p. 1), as last amended by Article 1 of the Act of 30 August 2021 (Federal Law Gazette I, p. 4074), https://www.gesetze-im-internet.de/englisch_patg/englisch_patg.html, accessed Jan 15 2024
+->>
+
 # Section 34
 
 (1) An application for the grant of a patent for an invention is to be filed with the German Patent and Trade Mark Office.

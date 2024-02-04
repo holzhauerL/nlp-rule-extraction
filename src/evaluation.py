@@ -23,15 +23,16 @@ def cnstrnts_gs(file_path):
         match = re.match(r'^c(\d{1,2}) = (.+)$', line)
         if match:
             current_key = f"c{match.group(1)}"
-            constraints_gs[current_key] = match.group(2)
+            constraints_gs[current_key] = match.group(2).replace("  ", " ").replace(" , ", ", ")
 
     return constraints_gs
 
-def _preprocess_constraint(constraint):
+def _extract_parts(constraint, part):
     """
-    Strips the constraint from all unnecesary characters.
-    :param constraint: The constraint string in the format "({PROCESS_STEP_1}, {PROCESS_STEP_2}, {directly follows}, {CONSTRAINT})".
-    :return: PROCESS_STEP_1 + " " + PROCESS_STEP_2 + " " + CONSTRAINT.
+    Extracts specific parts from a constraint string.
+    :param constraint: The constraint string.
+    :param part: The part to extract (0 for PROCESS_STEP_1, 1 for PROCESS_STEP_2, 3 for CONSTRAINT).
+    :return: Extracted part of the constraint.
     """
     # Trim leading and trailing whitespace
     constraint = constraint.strip()
@@ -47,8 +48,17 @@ def _preprocess_constraint(constraint):
     if len(parts) < 4:
         print(f"WARNING: Insufficient parts in constraint {constraint}. Expected at least 4 parts.")
 
+    # Return the requested part
+    return parts[part]
+
+def _preprocess_constraint(constraint):
+    """
+    Strips the constraint from all unnecesary characters.
+    :param constraint: The constraint string in the format "({PROCESS_STEP_1}, {PROCESS_STEP_2}, {directly follows}, {CONSTRAINT})".
+    :return: PROCESS_STEP_1 + " " + PROCESS_STEP_2 + " " + CONSTRAINT.
+    """
     # Concatenate the relevant parts (PROCESS_STEP_1 + PROCESS_STEP_2 + CONSTRAINT)
-    return parts[0] + " " + parts[1] + " " + parts[3]
+    return _extract_parts(constraint, 0) + " " + _extract_parts(constraint, 1) + " " + _extract_parts(constraint, 2)
 
 def sbert_smlarty(first_set, second_set, model='paraphrase-MiniLM-L6-v2'):
     """
@@ -78,30 +88,6 @@ def sbert_smlarty(first_set, second_set, model='paraphrase-MiniLM-L6-v2'):
             similarity_scores[f'{key1} - {key2}'] = similarity_matrix[i, j]
 
     return similarity_scores
-
-def _extract_parts(constraint, part):
-    """
-    Extracts specific parts from a constraint string.
-    :param constraint: The constraint string.
-    :param part: The part to extract (0 for PROCESS_STEP_1, 1 for PROCESS_STEP_2, 3 for CONSTRAINT).
-    :return: Extracted part of the constraint.
-    """
-    # Trim leading and trailing whitespace
-    constraint = constraint.strip()
-
-    # Check and remove the first two and the last two characters
-    if constraint.startswith("({") and constraint.endswith("})"):
-        constraint = constraint[2:-2]
-    else:
-        print("WARNING: Constraint",constraint,"format not right. Check start and end characters (should be '({' and '})').")
-
-    # Split the string at the specified delimiters
-    parts = constraint.split("}, {")
-    if len(parts) < 4:
-        print(f"WARNING: Insufficient parts in constraint {constraint}. Expected at least 4 parts.")
-
-    # Return the requested part
-    return parts[part]
 
 def sbert_smlarty_cmpntns(similarity_scores_dict, first_set, second_set, threshold=0.5, model='paraphrase-MiniLM-L6-v2', matching_mode='unique'):
     """
@@ -162,7 +148,7 @@ def sbert_smlarty_cmpntns(similarity_scores_dict, first_set, second_set, thresho
 
     return matches_step_1, matches_step_2, matches_constraints
 
-def evlt_prec_rec(extracted_set, gs_set, matches_step_1, matches_step_2, matches_constraints, individual_weights=True, weights=[0.2, 0.2, 0.6], hard_cut=True, threshold=0.8, plot_curves=True):
+def evlt_prec_rec(extracted_set, gs_set, matches_step_1, matches_step_2, matches_constraints, individual_weights=True, weights=[0.2, 0.2, 0.6], hard_cut=True, threshold=0.8, plot_curves=True, save_plot=True):
     """
     Evaluates precision and recall for matched constraints and optionally plots precision-recall curves.
 
@@ -176,6 +162,7 @@ def evlt_prec_rec(extracted_set, gs_set, matches_step_1, matches_step_2, matches
     :param hard_cut: Flag to apply a hard cut based on the similarity threshold. Default is True.
     :param threshold: The threshold value for hard cut. Only considered if hard_cut is True. All matches with simalrity scores below this threshold contribute to the precision and recall calculation with a value of 0. threshold == 0 yields the same result as hard_cut == False. Default for threshold is 0.8. 
     :param plot_curves: Flag to generate precision-recall curves plot. Default is True.
+    :param save_plot: Flag to save the generated precision-recall curves plot. Default is True.
     """
     # Copy DataFrames to prevent modification of original data
     dfs = [matches_step_1["Similarity"].copy(), matches_step_2["Similarity"].copy(), matches_constraints["Similarity"].copy()]
@@ -255,16 +242,17 @@ def evlt_prec_rec(extracted_set, gs_set, matches_step_1, matches_step_2, matches
         plt.ylim([0, 1.05])
         plt.text(1.1, 0.4, f"# of extracted constraints: {len(extracted_set)}\n# of constraints in the Gold Standard: {len(gs_set)}\n\nWeights are attributed to PROCESS_STEP_1,\nPROCESS_STEP_2 and the CONSTRAINT of each\nconstraint item. \n\nIndividual weights: {weights}\nDefault weights: [0.33, 0.33, 0.34]", horizontalalignment='left')
 
-        # Creating folder if not exists and saving the plot
-        plot_folder = 'plots'
-        if not os.path.exists(plot_folder):
-            os.makedirs(plot_folder)
+        if save_plot:
+            # Creating folder if not exists and saving the plot
+            plot_folder = 'plots'
+            if not os.path.exists(plot_folder):
+                os.makedirs(plot_folder)
 
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        plot_filename = f'precision_recall_curves_{timestamp}.png'
-        plot_path = os.path.join(plot_folder, plot_filename)
-        plt.savefig(plot_path, bbox_inches='tight')
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            plot_filename = f'precision_recall_curves_{timestamp}.png'
+            plot_path = os.path.join(plot_folder, plot_filename)
+            plt.savefig(plot_path, bbox_inches='tight')
 
-        # Printing the location of the saved plot
-        absolute_plot_path = os.path.abspath(plot_path)
-        print(f"Plot saved at: {absolute_plot_path}")
+            # Printing the location of the saved plot
+            absolute_plot_path = os.path.abspath(plot_path)
+            print(f"Plot saved at: {absolute_plot_path}")

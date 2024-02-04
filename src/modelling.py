@@ -1,9 +1,10 @@
 import random
-from spacy.matcher import Matcher
-from termcolor import colored
-from tabulate import tabulate
 from collections import defaultdict
+from tabulate import tabulate
+from termcolor import colored
 import pandas as pd
+from spacy.matcher import Matcher
+from spacy import displacy
 
 class ConstraintSearcher:
     """
@@ -872,7 +873,6 @@ class MetaConstraintSearcher(ConstraintSearcher):
 
         return self._update_ids(constraints, first_id)
     
-
 class ConstraintBuilder:
     """
     Class for constraint building based on the constraint items.
@@ -891,16 +891,29 @@ class ConstraintBuilder:
         self.con_and = "AND"
         self.con_or = "OR"
 
-    def build(self, text, constraints):
+    def build(self, text, constraints, verbose=False):
         """
         Builds the components for the formatted constraints for the Gold Standard comparison.
 
         :param text: The text to search within for constraints.
         :param constraints: A dictionary with detailed information about the found constraints.
+        :param verbose: Parameter to control the visualisation of the dependency tree and the entities. If True, visualisation is generated. Default is False.
         :return formatted_constraints: An array with the components for the formatted constraints.
         """
         random_integer = random.randint(1, 10)
         formatted_constraints = [(f"STEP_{random_integer}", "CONSTRAINT")]
+
+        doc = self.nlp(text)
+
+        if verbose:
+            displacy.render(doc, style='dep', jupyter=True)
+            displacy.render(doc, style='ent', jupyter=True)
+
+        # # print(constraints)    
+
+        # for i in range(len(constraints['id'])):
+        #     if constraints['type'] == 'EQ':
+
 
         return formatted_constraints
     
@@ -977,7 +990,7 @@ def get_constraints(nlp, builder, text, equality_params, inequality_params, meta
         if len(constraints['id']):
             id = constraints['id'][-1] + 1
             # Build constraints
-            formatted_constraints = builder.build(text, constraints)
+            formatted_constraints = builder.build(text, constraints, verbose)
         else: # If all constraints removed, reset id
             id = first_id
 

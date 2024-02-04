@@ -112,19 +112,19 @@ c1 = ({check project activity}, {check scope}, {directly follows}, {project_acti
 --
 c2 = ({check type of land}, {check soil disturbance attributable to project}, {directly follows}, {land_type != wetland})
 >>>
-c3 = ({check type of land}, {check soil disturbance attributable to project}, {directly follows}, {land_project_activity != wetland})
+c2 = ({check type of land}, {check soil disturbance attributable to project}, {directly follows}, {land_project_activity != wetland})
 --
 
 --
 c3 = ({check soil disturbance attributable to project}, {check compliance with applicability conditions of contained tools}, {directly follows}, {(soil_organicity == not_organic OR (soil_organicity == organic AND area_percentage <= 10)) AND (lu_mm_practices_subj_input == not_subject_no_input OR (lu_mm_practices_subj_input == subject_and_input AND area_percentage <= 10))})
 >>>
-c4 = ({check soil disturbance attributable to project}, {check compliance with applicability conditions of contained tools}, {directly follows}, {(containing_organic_soils == False OR (containing_organic_soils == True AND soil_disturbance_area <= 10)) AND (land_subject_to_land_use_and_management == False OR (land_subject_to_land_use_and_management == True AND  receives_listed_inputs == True AND soil_disturbance_area <= 10))})
+c3 = ({check type of land}, {check compliance with applicability conditions of contained tools}, {directly follows}, {land_project_activity != wetland AND (containing_organic_soils == False OR (containing_organic_soils == True AND soil_disturbance_area <= 10)) AND (land_subject_to_land_use_and_management == False OR (land_subject_to_land_use_and_management == True AND  receives_listed_inputs == True AND soil_disturbance_area <= 10))})
 --
 
 --
 c4 = ({check compliance with applicability conditions of contained tools}, {apply methodolgy}, {directly follows}, {contained_tools_compliance == compliant})
 >>>
-c5 = ({check compliance with applicability conditions of contained tools}, {apply methodolgy}, {directly follows}, {comply_with_contained_tools == True})
+c4 = ({check compliance with applicability conditions of contained tools}, {apply methodolgy}, {directly follows}, {comply_with_contained_tools == True})
 --
 
 # output_cdm_03
@@ -256,7 +256,7 @@ c9 = ({check project design document}, {check aggregate electricity savings}, {d
 --
 c13 = ({check annual aggregate electricity savings}, {apply methodolgy}, {directly follows}, {electricity_savings <= 60})
 >>>
-c13 = ({check aggregate electricity savings}, {apply methodolgy}, {directly follows}, {electricity_savings_per_year <= 60})
+c10 = ({check aggregate electricity savings}, {apply methodolgy}, {directly follows}, {electricity_savings_per_year <= 60})
 --
 
 # output_cdm_05
