@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
+
 def cnstrnts_gs(file_path):
     """
     Extracts the constraints from the Gold Standard (GS) .txt file into a dictionary. 

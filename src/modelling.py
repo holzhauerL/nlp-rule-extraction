@@ -1072,21 +1072,21 @@ class ConstraintBuilder:
 
         return filtered_tokens
 
-
-    def build_component(self, text, constraints, i, negated=False):
+    def build_component(self, text, constraints, i, negated=False, keep_tokens=4):
         """
         Rule-based building of the constraint components.
 
         :param text: The text to search within for constraints.
         :param constraints: A dictionary with detailed information about the found constraints.
         :param i: Index in the constraint dict.
+        :param negated: Flag to determine if a negation should be performed (additional to negations triggered by matches).
+        :param keep_tokens: Number of tokens to keep.
         :return: One single constraint component. 
         """
         tokens = text.split()
         
         type = constraints['type'][i]
         pattern = constraints['pattern'][i]
-        exception = constraints['exception'][i]
         context = constraints['context'][i]
         match = constraints['match'][i]
         symbol = constraints['symbol'][i]
@@ -1102,46 +1102,60 @@ class ConstraintBuilder:
 
             indices = list(range(match[0],match[1]+1))
             filtered_tokens = self._get_subset(tokens, indices)
+            
+            # Going from the end to the beginning, check the number of tokens to keep to the end of doc_left
+            filtered_tokens = filtered_tokens[-keep_tokens:]
 
             # Construct left_part from filtered tokens
             left_part = "_".join(filtered_tokens)
-        
-        # For INEQ
-        if type == 'INEQ' and not exception:
-            
-            # The reference value
-            right_part = tokens[match[1]]
+
+        # For coherent INEQ and EQ and patterns
+        elif symbol is not self.empty:
 
             # Define the indices to keep the relation to the original token
             indices_left = list(range(context[0],match[0]))
             indices_right = list(range(match[1]+1,context[1]+1))
-
-            # Going from the end to the beginning, check the four tokens to the end of doc_left
+            # Get the tokens left and right of the match
             filtered_tokens_left = self._get_subset(tokens, indices_left)
-            filtered_tokens_left = filtered_tokens_left[-4:]  # Keep only up to the last four tokens
+            filtered_tokens_right = self._get_subset(tokens, indices_right)
 
-            # If the left_array has not yet four tokens, use doc_right
-            if len(filtered_tokens_left) < 4:
-                filtered_tokens_right = self._get_subset(tokens, indices_right)
-                # Add to the array without exceeding four tokens in total
-                additional_tokens_needed = 4 - len(filtered_tokens_left)
-                filtered_tokens_left.extend(filtered_tokens_right[:additional_tokens_needed])
+            # Going from the end to the beginning, check the number of tokens to keep to the end of doc_left
+            filtered_tokens_left = filtered_tokens_left[-keep_tokens:] 
 
-            filtered_tokens = filtered_tokens_left
+            # For general INEQ
+            if type == 'INEQ':
+                
+                # The reference value
+                right_part = tokens[match[1]]
 
-            # Construct left_part from filtered tokens
-            left_part = "_".join(filtered_tokens)
+                # If the left_array has not yet the number of tokens to keep, use doc_right
+                if len(filtered_tokens_left) < keep_tokens:
+                    # Add to the array without exceeding the number of tokens to keep in total
+                    additional_tokens_needed = keep_tokens - len(filtered_tokens_left)
+                    filtered_tokens_left.extend(filtered_tokens_right[:additional_tokens_needed])
 
-            # doc = self.nlp(subset_left + " " + subset_right)
+                filtered_tokens = filtered_tokens_left
 
-            # # displacy.render(doc, style='dep', jupyter=True)
+                # Construct left_part from filtered tokens
+                left_part = "_".join(filtered_tokens)
+
+            # For general EQ
+            if type == 'EQ':
+
+                filtered_tokens_right = filtered_tokens_right[:keep_tokens] 
+
+                left_part = "_".join(filtered_tokens_left)
+                right_part = "_".join(filtered_tokens_right)
+
         else:
             left_part = "PLACEHOLDER"
             right_part = "True"
+        
+                # doc = self.nlp(subset_left + " " + subset_right)
+                # displacy.render(doc, style='dep', jupyter=True)
 
         return left_part + " " + symbol + " " + right_part
 
-    
     def streamline(self, formatted_constraints):
         """
         Streamlines the constraints into the end format relevant for the Gold Standard comparison.
