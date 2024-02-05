@@ -29,6 +29,6 @@ c1 = ({check authority}, {check completeness of application}, {directly follows}
 
 c2 = ({check completeness of application}, {check clarity of application}, {directly follows}, {application_name == True AND application_request_for_grant == True AND application_patent_claim == True AND application_description == True AND application_drawings == True})
 
-c3 = ({check clarity of application}, {check number of contained inventions}, {application_dicslose_clear_and_complete == True})
+c3 = ({check clarity of application}, {check number of contained inventions}, {directly follows}, {application_dicslose_clear_and_complete == True})
 
 c4 = ({check number of contained inventions}, {file application}, {directly follows}, {application_relate_one_invention == True OR linked == True})

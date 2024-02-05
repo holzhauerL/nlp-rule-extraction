@@ -384,7 +384,7 @@ ADD
 ----
 
 --
-c3 = ({check clarity of application}, {check number of contained inventions}, {application_dicslose_clear_and_complete == True})
+c3 = ({check clarity of application}, {check number of contained inventions}, {directly follows},{application_dicslose_clear_and_complete == True})
 --
 
 ----

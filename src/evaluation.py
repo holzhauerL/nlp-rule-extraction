@@ -24,7 +24,7 @@ def cnstrnts_gs(file_path):
         match = re.match(r'^c(\d{1,2}) = (.+)$', line)
         if match:
             current_key = f"c{match.group(1)}"
-            constraints_gs[current_key] = match.group(2).replace("  ", " ").replace(" , ", ", ")
+            constraints_gs[current_key] = match.group(2).replace("   ", " ").replace("  ", " ").replace(" , ", ", ").replace("},{", "}, {")
 
     return constraints_gs
 
