@@ -12,16 +12,16 @@ class Preprocessor:
     """
     Class for reading .txt files, preprocessing the text, and splitting into sentences, while also extracting enumeration details.
     """
-    def __init__(self, nlp, file_paths, verbose):
+    def __init__(self, nlp, input_file_paths, verbose):
         """
         Initializes the Preprocessor.
 
         :param nlp: An instance of a spaCy Language model used for processing text.
-        :param file_paths: A dictionary with the paths to the .txt files.
+        :param file_paths: A dictionary with the paths to the .txt input files.
         :param verbose: Parameter to control the printed output. If True, output is printed.
         """
         self.nlp = nlp
-        self.file_paths = file_paths
+        self.file_paths = input_file_paths
         self.verbose = verbose
 
     def txt_to_df(self, file_path, section_start="# ", subsection_start="## "):
