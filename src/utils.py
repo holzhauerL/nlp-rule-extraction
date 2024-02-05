@@ -1,13 +1,13 @@
 import os
-import docx2txt
 import sys
 import subprocess
 import spacy
-
+import matplotlib.colors as mcolors
+from sentence_transformers import SentenceTransformer
 
 def load_spacy(model):
     """
-    Evaluating if the pre-trained SpaCy model is already installed, and installing it, if it isn't. 
+    Evaluating if the pre-trained spaCy model is already installed, and installing it, if it isn't. 
 
     :param model: Name of the pre-trained spaCy  model. 
     :return: Pre-trained spaCy model.
@@ -21,6 +21,15 @@ def load_spacy(model):
         print("Installing", model, "model...")
         subprocess.check_call([sys.executable, "-m", "spacy", "download", model])
     return nlp
+
+def load_sbert(model):
+    """
+    Loading the S-BERTmodel.
+
+    :param model: Name of the pre-trained S-BERT  model. 
+    :return: Pre-trained S-BERT model.
+    """
+    return SentenceTransformer(model)
 
 def generate_paths(cases, mode):
     """
@@ -37,15 +46,26 @@ def generate_paths(cases, mode):
 
     return {key: os.path.join('..', 'data', value[0] if isinstance(value, tuple) else value, prefix + (value[1] if isinstance(value, tuple) else value) + ".txt") for key, value in cases.items()}
 
-# TODO: Generalize
-def docx_to_txt(docx_path='EB115.docx',txt_path='output.txt'):
+def generate_color_mapping(cases):
     """
-    Convert .docx to .txt.
-    :param docx_path: Path of the .doxc file.
-    :param txt_path: Path of the .txt file.
-    """
-    MY_TEXT = docx2txt.process(docx_path)
-    with open(txt_path, "w") as text_file:
-        print(MY_TEXT, file=text_file)
+    Generate a color mapping for each unique case name.
 
-# docx_to_txt(docx_path='input_cdm_03.docx')
+    :param cases: A dictionary containing case names as keys.
+    :return: A dictionary mapping each case name to a color string.
+    """
+    color_mapping = {}
+    available_colors = list(mcolors.TABLEAU_COLORS.keys())
+    
+    # List of predefined colors in a specific order
+    predefined_colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan']
+
+    for case in cases.keys():
+        if case not in color_mapping:
+            if predefined_colors:
+                color = predefined_colors.pop(0)
+            else:
+                # If predefined colors are exhausted, use random colors
+                color = available_colors.pop()
+            color_mapping[case] = color
+
+    return color_mapping
