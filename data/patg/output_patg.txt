@@ -31,4 +31,4 @@ c2 = ({check completeness of application}, {check clarity of application}, {dire
 
 c3 = ({check clarity of application}, {check number of contained inventions}, {application_dicslose_clear_and_complete == True})
 
-c4 = ({check number of contained inventions}, {file application}, {directly follows}, {application_relate_one_invention == True OR (application_relate_one_invention == False AND linked == True)})
+c4 = ({check number of contained inventions}, {file application}, {directly follows}, {application_relate_one_invention == True OR linked == True})

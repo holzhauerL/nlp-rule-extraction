@@ -39,6 +39,6 @@ c3 = ({check extension}, {check accessibility by road}, {directly follows}, {ext
 
 c4 = ({check accessibility by road}, {check compliance of fuels used in baseline or project case}, {directly follows}, {cable_car_accessibility == accessible_by_road})
 
-c5 = ({check compliance of fuels used in baseline or project case}, {check emission reductions of measures}, {directly follows}, {bio_fuel_blends_used == False OR (bio_fuel_blends_used == True AND specific_fuel_consumption_value_adjusted == True)})
+c5 = ({check compliance of fuels used in baseline or project case}, {check emission reductions of measures}, {directly follows}, {bio_fuel_blends_used == False OR specific_fuel_consumption_value_adjusted == True})
 
 c6 = ({check emission reductions of measures}, {apply methodology}, {directly follows}, {emission_reductions_annually <= 60})

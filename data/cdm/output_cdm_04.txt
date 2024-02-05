@@ -72,9 +72,9 @@ c4 = ({check technologies used}, {check affect of project activities}, {directly
 
 c5 = ({check affect of project activities}, {check refrigerant}, {directly follows}, {project_activity_affects != on_site_district_heating_plant OR project_activity_affects != on_site_district_cooling_plant OR project_activity_affects != distribution_networks})
 
-c6 = ({check refrigerant}, {check fuel switch}, {directly follows}, {energy_efficient_equipment_contain_refrigerant == False OR (energy_efficient_equipment_contain_refrigerant == True AND ozone_depleting_potential == False)})
+c6 = ({check refrigerant}, {check fuel switch}, {directly follows}, {energy_efficient_equipment_contain_refrigerant == False OR ozone_depleting_potential == False})
 
-c7 = ({check fuel switch}, {check claimed emission reductions}, {directly follows}, {project_activity_includes_fuel_switching == False OR (project_activity_includes_fuel_switching == True AND requirements_followed == True)})
+c7 = ({check fuel switch}, {check claimed emission reductions}, {directly follows}, {project_activity_includes_fuel_switching == False OR requirements_followed == True})
 
 c8 = ({check claimed emission reductions}, {check project design document}, {directly follows}, {emission_reductions_included_in_other_project == False})
 

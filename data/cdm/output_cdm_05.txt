@@ -114,10 +114,10 @@ c9 = ({check hydro power plant conditions}, {check heat and power cogeneration},
 
 c10 = ({check heat and power cogeneration}, {check non-renewable components}, {directly follows}, {combined_heat_and_power == False})
 
-c11 = ({check non-renewable components}, {check fossil fuel}, {directly follows}, {renewable_and_non_renewable == False OR (renewable_and_non_renewable == True AND capacity_renewable < 15)})
+c11 = ({check non-renewable components}, {check fossil fuel}, {directly follows}, {renewable_and_non_renewable == False OR capacity_renewable < 15})
 
-c12 = ({check fossil fuel}, {check retrofit or replacement}, {directly follows}, {co_fires_fossil_fuel == False OR (co_fires_fossil_fuel == True AND capacity_entire_unit < 15)})
+c12 = ({check fossil fuel}, {check retrofit or replacement}, {directly follows}, {co_fires_fossil_fuel == False OR capacity_entire_unit < 15})
 
-c13 = ({check retrofit or replacement}, {check existing renewable electricity generation facility}, {directly follows}, {(involve_retrofit == False AND involve_replacement == False) OR ((involve_retrofit == True OR involve_replacement == True) AND total_output < 15)})
+c13 = ({check retrofit or replacement}, {check existing renewable electricity generation facility}, {directly follows}, {(involve_retrofit == False AND involve_replacement == False) OR total_output < 15})
 
-c14 = ({check existing renewable electricity generation facility}, {apply methodology}, {directly follows}, {involve_addition == False OR (involve_addition == True AND total_capacity_units_added < 15 AND physically_distinct == True)})
+c14 = ({check existing renewable electricity generation facility}, {apply methodology}, {directly follows}, {involve_addition == False OR (total_capacity_units_added < 15 AND physically_distinct == True)})

@@ -933,82 +933,213 @@ class ConstraintBuilder:
     """
     Class for constraint building based on the constraint items.
     """
-    def __init__(self, nlp):
+    def __init__(self, nlp, verbose=False):
         """
         Initializes the ConstraintBuilder.
 
         :param nlp: An instance of a spaCy Language model used for processing text.
-        :param parameters: A dictionary containing various settings and parameters for constraint searching.
+        :param verbose: Parameter to control the visualisation of the dependency tree and the entities. If True, visualisation is generated. Default is False.
         """
         self.nlp = nlp
+        self.verbose = verbose
         self.con_follow = "FOLLOW"
         self.con_start = "START"
         self.con_end = "END"
         self.con_and = "AND"
         self.con_or = "OR"
+        self.empty = "NA"
+        self.negations = {
+            "<": ">=",
+            "<=": ">",
+            ">": "<=",
+            ">=": "<",
+            "==": "!=",
+            "!=": "=="
+        }
 
-
-
-
-
-
-    def build(self, text, constraints, verbose=False):
+    def build_constraint(self, text, constraints):
         """
-        Builds the components for the formatted constraints for the Gold Standard comparison.
+        Builds the structure for the formatted constraint for the Gold Standard comparison.
 
         :param text: The text to search within for constraints.
         :param constraints: A dictionary with detailed information about the found constraints.
-        :param verbose: Parameter to control the visualisation of the dependency tree and the entities. If True, visualisation is generated. Default is False.
-        :return formatted_constraints: An array with the components for the formatted constraints.
+        :return formatted_constraints: An array with the formatted constraint.
         """
         random_integer = random.randint(1, 10)
-        formatted_constraints = []
-
-        tokens = text.split()
-        stop_words = set(self.nlp.Defaults.stop_words)
-        
-        constraint = "CONSTRAINT"
+        formatted_constraint = []
+        constraint = ""
         step = f"STEP_{random_integer}"
+        level_history = []
+        number_of_components = len(constraints['id'])
+
+        i = 0
+        open_parantheses = 0
         
-        for i in range(len(constraints['id'])):
+        while True:
             type = constraints['type'][i]
-            exception = constraints['exception'][i]
-            symbol = constraints['symbol'][i]
+            pattern = constraints['pattern'][i]
+            level = constraints['level'][i]
+            connector = constraints['successor'][i][1]
 
-            if type in ['EQ', 'INEQ']:
-                context = constraints['context'][i]
-                # Define the indices to keep in relation to the original set of tokens for this chunk
-                indices = list(range(context[0],context[1]+1))
+            # Enumeration items
+            if 'ENUM' in pattern:
+                # First enumeration item
+                if not (level_history):
+                    constraint += "("
+                    open_parantheses += 1
+                # Not the first item, but same level as before
+                elif level == level_history[-1]:
+                    constraint += ") " + connector + " (" 
+                # Not the first item, one level deeper
+                elif level > level_history[-1]:
+                    # If the previous constraint component was a connector, do not add a connector
+                    if 'CONNECTOR' in constraints['pattern'][i-1]:
+                        constraint += "(("
+                    else: 
+                        constraint += " " + self.con_and + " ((" 
+                    open_parantheses += 2
+                # Not the first item, one level shallower
+                elif level < level_history[-1]:
+                    constraint += "))) " + connector + " ("
+                    open_parantheses -= 2
+                # Save current level
+                level_history.append(level)
 
-                match = constraints['match'][i]
+            # Connectors
+            elif 'CONNECTOR' in pattern:
+                constraint += " " + connector + " "
 
-                if type == 'INEQ' and not exception:
-                    # Remove the match
-                    for idx in range(match[0], match[1] + 1):
-                        if idx in indices:
-                            indices.remove(idx)
-                    
-                    # The numerical part
-                    right_part = tokens[match[1]]
-                
-                    subset = " ".join([tokens[idx] for idx in indices if tokens[idx] not in stop_words])
-                    
-                    doc = self.nlp(subset)
+            # For-/If-clauses
+            elif any(x in pattern for x in ['FOR_', 'IF_']):
+                # Special structure for two connected clauses with the same then
+                # i + 5 ensures five more constraints after the first for/if
+                if i + 5 < number_of_components and 'CONNECTOR' in constraints['pattern'][i+2] and any(x in constraints['pattern'][i+3] for x in ['FOR_', 'IF_']):
+                    connector = constraints['successor'][i+2][1]
+                    connector_neg = self.con_or if connector == self.con_and else self.con_and 
+                    # First, add ELSE (negated IF)
+                    constraint += "((" + self.build_component(text, constraints, i+1, negated=True) + " " + connector_neg + " " + self.build_component(text, constraints, i+4, negated=True)
+                    # Add connector
+                    constraint += ") " + self.con_or + " "
+                    # Add THEN (IF can be skipped, since connected with OR)
+                    constraint += self.build_component(text, constraints, i+5) + ")"
+                    # Skip the already processed items
+                    i += 5
+                # Default case
+                elif i + 2 < number_of_components:
+                    # First, add ELSE (negated IF)
+                    constraint += "(" + self.build_component(text, constraints, i+1, negated=True)
+                    # Add connector
+                    constraint += " " + self.con_or + " "
+                    # Add THEN (IF can be skipped, since connected with OR)
+                    constraint += self.build_component(text, constraints, i+2) + ")"
+                    # Skip the already processed items
+                    i += 2
 
-                    # Remove tokens with POS == 'SYM' or IS_PUNCT == True
-                    filtered_tokens = [token.text for token in doc if token.pos_ != 'SYM' and not token.is_punct]
+            # For basic components
+            elif type in ['EQ', 'INEQ'] or 'BOOL':
+                constraint += self.build_component(text, constraints, i)
 
-                    # Construct left_part from filtered tokens
-                    left_part = "_".join(filtered_tokens)
+            i += 1
+            if i == number_of_components:
+                constraint += ")"*open_parantheses
+                break
 
-                    constraint = left_part + " " + symbol + " " + right_part
+        formatted_constraint.append((step, constraint))
 
-                    displacy.render(doc, style='dep', jupyter=True)
+        return formatted_constraint
+    
+    def _get_subset(self, tokens, indices, filter_stop=True, filter_alpha=True, filter_pos=['ADJ', 'NOUN', 'VERB']):
+        """
+        From the list of tokens, retrieve a subset based on indices. Optionally, filter stop words and tokens with specific POS tags.
 
-                    formatted_constraints.append((step, constraint))
+        :param tokens: List of tokens.
+        :param indices: List of indices, referring to tokens.
+        :param filter_stop: Flag to determine filtering of stop words. If True, stop words are filtered out. 
+        :param filter_alpha: Flag to determine filtering of alpha characters. If True, only alpha characters are considered.
+        :param filter_pos: List of POS tags to consider for filtering. If empty, no filtering for POS tag is performed. 
+        :return: List of subset of tokens, optionally filtered.
+        """
+        if filter_stop:
+            stop_words = set(self.nlp.Defaults.stop_words)
+            subset = " ".join([tokens[idx] for idx in indices if tokens[idx] not in stop_words])
+        else:
+            subset = " ".join([tokens[idx] for idx in indices])
+        
+        doc = self.nlp(subset)
 
-        return formatted_constraints
+        # Filter tokens based on is_alpha and POS tags
+        filtered_tokens = [token.text for token in doc if (not filter_alpha or token.is_alpha) and (not filter_pos or token.pos_ in filter_pos)]
 
+        return filtered_tokens
+
+
+    def build_component(self, text, constraints, i, negated=False):
+        """
+        Rule-based building of the constraint components.
+
+        :param text: The text to search within for constraints.
+        :param constraints: A dictionary with detailed information about the found constraints.
+        :param i: Index in the constraint dict.
+        :return: One single constraint component. 
+        """
+        tokens = text.split()
+        
+        type = constraints['type'][i]
+        pattern = constraints['pattern'][i]
+        exception = constraints['exception'][i]
+        context = constraints['context'][i]
+        match = constraints['match'][i]
+        symbol = constraints['symbol'][i]
+
+        if negated and symbol is not self.empty:
+            symbol = self.negations[symbol]
+
+        # For BOOL
+        if 'BOOL' in pattern:
+            # To prevent != True
+            right_part = "True" if symbol == "==" else "False"
+            symbol = "=="
+
+            indices = list(range(match[0],match[1]+1))
+            filtered_tokens = self._get_subset(tokens, indices)
+
+            # Construct left_part from filtered tokens
+            left_part = "_".join(filtered_tokens)
+        
+        # For INEQ
+        if type == 'INEQ' and not exception:
+            
+            # The reference value
+            right_part = tokens[match[1]]
+
+            # Define the indices to keep the relation to the original token
+            indices_left = list(range(context[0],match[0]))
+            indices_right = list(range(match[1]+1,context[1]+1))
+
+            # Going from the end to the beginning, check the four tokens to the end of doc_left
+            filtered_tokens_left = self._get_subset(tokens, indices_left)
+            filtered_tokens_left = filtered_tokens_left[-4:]  # Keep only up to the last four tokens
+
+            # If the left_array has not yet four tokens, use doc_right
+            if len(filtered_tokens_left) < 4:
+                filtered_tokens_right = self._get_subset(tokens, indices_right)
+                # Add to the array without exceeding four tokens in total
+                additional_tokens_needed = 4 - len(filtered_tokens_left)
+                filtered_tokens_left.extend(filtered_tokens_right[:additional_tokens_needed])
+
+            filtered_tokens = filtered_tokens_left
+
+            # Construct left_part from filtered tokens
+            left_part = "_".join(filtered_tokens)
+
+            # doc = self.nlp(subset_left + " " + subset_right)
+
+            # # displacy.render(doc, style='dep', jupyter=True)
+        else:
+            left_part = "PLACEHOLDER"
+            right_part = "True"
+
+        return left_part + " " + symbol + " " + right_part
 
     
     def streamline(self, formatted_constraints):
@@ -1056,7 +1187,7 @@ def get_constraints(nlp, builder, text, equality_params, inequality_params, meta
     :return id: The ID of the last match + 1 found by the current function within the document.
     """
     first_id = id
-    formatted_constraints = []
+    formatted_constraint = [] # Array to fit with the format of the other attributes
     # Initialize searchers
     inequality = InequalityConstraintSearcher(nlp, inequality_params)
     equality = EqualityConstraintSearcher(nlp, equality_params)
@@ -1083,8 +1214,8 @@ def get_constraints(nlp, builder, text, equality_params, inequality_params, meta
 
         if len(constraints['id']):
             id = constraints['id'][-1] + 1
-            # Build constraints
-            formatted_constraints = builder.build(text, constraints, verbose)
+            # Build constraint
+            formatted_constraint = builder.build_constraint(text, constraints)
         else: # If all constraints removed, reset id
             id = first_id
 
@@ -1101,10 +1232,10 @@ def get_constraints(nlp, builder, text, equality_params, inequality_params, meta
             print()
             print(tabulate(combined_table_data, headers=constraints.keys()))
             print()
-            for c in formatted_constraints:
+            for c in formatted_constraint:
                 print(c)
 
-    constraints['formatted'] = formatted_constraints
+    constraints['formatted'] = formatted_constraint
 
     return constraints, id
 
@@ -1122,7 +1253,7 @@ def get_constraints_from_data(nlp, data, equality_params, inequality_params, met
     :param verbose: Parameter to control the printed output. If True, output is printed.
     :return constraints: A dictionary with detailed information about the found constraints. 
     """
-    builder = ConstraintBuilder(nlp)
+    builder = ConstraintBuilder(nlp, verbose)
 
     delimiter_line = "+"*80
     constraints_tmp = defaultdict(lambda: defaultdict(list)) # Enable dict assignment before knowing the keys

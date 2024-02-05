@@ -162,7 +162,7 @@ c4 = ({check accessibility by road}, {check compliance of fuels used in baseline
 --
 c4 = ({check compliance of fuels used in baseline or project case}, {check emission reductions of measures}, {directly follows}, {fuel_complinace == compliant})
 >>>
-c5 = ({check compliance of fuels used in baseline or project case}, {check emission reductions of measures}, {directly follows}, {bio_fuel_blends_used == False OR (bio_fuel_blends_used == True AND specific_fuel_consumption_value_adjusted == True)})
+c5 = ({check compliance of fuels used in baseline or project case}, {check emission reductions of measures}, {directly follows}, {bio_fuel_blends_used == False OR specific_fuel_consumption_value_adjusted == True})
 --
 
 --
@@ -232,13 +232,13 @@ c5 = ({check affect of project activities}, {check refrigerant}, {directly follo
 --
 c6 = ({check if equipment contains refrigerator}, {check fuel switch}, {directly follows}, {refrigerant == not_contained})
 >>>
-c6 = ({check refrigerant}, {check fuel switch}, {directly follows}, {energy_efficient_equipment_contain_refrigerant == False OR (energy_efficient_equipment_contain_refrigerant == True AND ozone_depleting_potential == False)})
+c6 = ({check refrigerant}, {check fuel switch}, {directly follows}, {energy_efficient_equipment_contain_refrigerant == False OR ozone_depleting_potential == False})
 --
 
 --
 c8 = ({check fuel switch}, {follow AMS-III.B}, {directly follows}, {activity_type == fuel_switch})
 >>>
-c7 = ({check fuel switch}, {check claimed emission reductions}, {directly follows}, {project_activity_includes_fuel_switching == False OR (project_activity_includes_fuel_switching == True AND requirements_followed == True)})
+c7 = ({check fuel switch}, {check claimed emission reductions}, {directly follows}, {project_activity_includes_fuel_switching == False OR requirements_followed == True})
 --
 
 --
@@ -274,7 +274,7 @@ c6 = ({check grid connection}, {check power plant type}, {directly follows}, {in
 --
 
 --
-c12 = ({check fossil fuel}, {check retrofit or replacement}, {directly follows}, {co_fires_fossil_fuel == False OR (co_fires_fossil_fuel == True AND capacity_entire_unit < 15)})
+c12 = ({check fossil fuel}, {check retrofit or replacement}, {directly follows}, {co_fires_fossil_fuel == False OR capacity_entire_unit < 15})
 --
 
 ----
@@ -332,19 +332,19 @@ c10 = ({check heat and power cogeneration}, {check non-renewable components}, {d
 --
 c9 = ({check non-renewable components}, {check retrofit or replacement}, {directly follows}, {(unit_added == renewable_and_non_renewable AND capacity_renewable < 15) OR (unit_added == renewable_only)})
 >>>
-c11 = ({check non-renewable components}, {check fossil fuel}, {directly follows}, {renewable_and_non_renewable == False OR (renewable_and_non_renewable == True AND capacity_renewable < 15)})
+c11 = ({check non-renewable components}, {check fossil fuel}, {directly follows}, {renewable_and_non_renewable == False OR capacity_renewable < 15})
 --
 
 --
 c10 = ({check retrofit or replacement}, {check existing renewable electricity generation facility}, {directly follows}, {((implementation == retrofit OR implementation == replacement) AND final_output < 15) OR (implementation != retrofit AND implementation != replacement)})
 >>>
-c13 = ({check retrofit or replacement}, {check existing renewable electricity generation facility}, {directly follows}, {(involve_retrofit == False AND involve_replacement == False) OR ((involve_retrofit == True OR involve_replacement == True) AND total_output < 15)})
+c13 = ({check retrofit or replacement}, {check existing renewable electricity generation facility}, {directly follows}, {(involve_retrofit == False AND involve_replacement == False) OR total_output < 15})
 --
 
 --
 c11 = ({check existing renewable electricity generation facility}, {apply methodology}, {directly follows}, {addition_of_renewable_units == no_addition OR (addition_of_renewable_units == addition AND capacity_added < 15 AND type_of_units_added == physically_distinct)})
 >>>
-c14 = ({check existing renewable electricity generation facility}, {apply methodology}, {directly follows}, {involve_addition == False OR (involve_addition == True AND total_capacity_units_added < 15 AND physically_distinct == True)})
+c14 = ({check existing renewable electricity generation facility}, {apply methodology}, {directly follows}, {involve_addition == False OR (total_capacity_units_added < 15 AND physically_distinct == True)})
 --
 
 # output_coffee
@@ -422,5 +422,5 @@ c2 = ({check completeness of application}, {check clarity of application}, {dire
 --
 c4 = ({check number of contained inventions}, {file application}, {directly follows}, {number_of_inventions == 1})
 >>>
-c4 = ({check number of contained inventions}, {file application}, {directly follows}, {application_relate_one_invention == True OR (application_relate_one_invention == False AND linked == True)})
+c4 = ({check number of contained inventions}, {file application}, {directly follows}, {application_relate_one_invention == True OR linked == True})
 --
