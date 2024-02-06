@@ -128,16 +128,18 @@ class Evaluator:
         :param second_set: Second set of constraints, expected as a dictionary.
         :return: Similartiy scores in a dictionary.
         """
-        
-        # Preprocess and create embeddings for each set of constraints
-        embeddings1 = self.model.encode([self._preprocess_constraint(v.replace("_", " ")) for v in first_set.values()], convert_to_tensor=True)
-        embeddings2 = self.model.encode([self._preprocess_constraint(v.replace("_", " ")) for v in second_set.values()], convert_to_tensor=True)
+        if first_set and second_set:
+            # Preprocess and create embeddings for each set of constraints
+            embeddings1 = self.model.encode([self._preprocess_constraint(v.replace("_", " ")) for v in first_set.values()], convert_to_tensor=True)
+            embeddings2 = self.model.encode([self._preprocess_constraint(v.replace("_", " ")) for v in second_set.values()], convert_to_tensor=True)
 
-        # Compute cosine similarity between the embeddings
-        similarity_matrix = cosine_similarity(embeddings1, embeddings2)
+            # Compute cosine similarity between the embeddings
+            similarity_matrix = cosine_similarity(embeddings1, embeddings2)
 
-        # Create and populate the similarity_scores dictionary
-        similarity_scores = {f'{key1} - {key2}': similarity_matrix[i, j] for i, key1 in enumerate(first_set.keys()) for j, key2 in enumerate(second_set.keys())}
+            # Create and populate the similarity_scores dictionary
+            similarity_scores = {f'{key1} - {key2}': similarity_matrix[i, j] for i, key1 in enumerate(first_set.keys()) for j, key2 in enumerate(second_set.keys())}
+        else:
+            similarity_scores = {}
 
         return similarity_scores
 
@@ -212,8 +214,11 @@ class Evaluator:
         non_zero_count = (df != 0).sum().sum()
         
         # Precision and recall with individual weights for PROCESS_STEP_1, PROCESS_STEP_2 and CONSTRAINT.
-        prec = sum(non_zero_count / len(extracted_set) * w for df, w in zip(dfs, weights))
         rec = sum(non_zero_count / len(gs_set) * w for df, w in zip(dfs, weights))
+        if extracted_set:
+            prec = sum(non_zero_count / len(extracted_set) * w for df, w in zip(dfs, weights))
+        else:
+            prec = rec = 0
 
         return prec, rec
 
@@ -241,8 +246,12 @@ class Evaluator:
         precision, recall = self._precision_recall(dfs, cutoff, extracted_set, gs_set, weights)   
 
         # Calculate maximum possible precision and recall (cutoff = 0)
-        max_prec = len(dfs[0]) / len(extracted_set)
         max_rec = len(dfs[0]) / len(gs_set)
+        if extracted_set:
+            max_prec = len(dfs[0]) / len(extracted_set)
+        else:
+            max_prec = max_rec = 0
+            print("No constraints extracted.")
 
         # Calculate precision and recall for each cutoff
         cutoff_linspace = np.arange(0, 1.01, 0.01)  # Including buffer in range
