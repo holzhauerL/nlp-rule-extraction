@@ -1151,8 +1151,8 @@ class ConstraintBuilder:
             left_part = "PLACEHOLDER"
             right_part = "True"
         
-                # doc = self.nlp(subset_left + " " + subset_right)
-                # displacy.render(doc, style='dep', jupyter=True)
+        # doc = self.nlp(subset_left + " " + subset_right)
+        # displacy.render(doc, style='dep', jupyter=True)
 
         return left_part + " " + symbol + " " + right_part
 
