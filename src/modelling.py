@@ -1042,7 +1042,7 @@ class ConstraintBuilder:
 
             # For basic components
             elif type in ['EQ', 'INEQ'] or 'BOOL':
-                constraint += self.build_component(text, constraints, i)
+                constraint += self.build_component(text, constraints, i, build_mode=build_mode)
 
             i += 1
             if i == number_of_components:
@@ -1104,7 +1104,7 @@ class ConstraintBuilder:
         # doc = self.nlp(subset_left + " " + subset_right)
         # displacy.render(doc, style='dep', jupyter=True)
 
-        if negated and symbol is not self.empty:
+        if negated and symbol is not self.empty and build_mode == 'rules':
             symbol = self.negations[symbol]
         
         if build_mode == 'rules':
@@ -1177,49 +1177,46 @@ class ConstraintBuilder:
                 # To prevent != True
                 right_part = "True" if symbol == "==" else "False"
                 symbol = "=="
-                prompt_2 = self.parameters[key]['prompt_2_a'] + " " + symbol + " " + right_part + " " + self.parameters[key]['prompt_2_b'] + " " + search_context
             
             # For coherent INEQ and EQ and patterns
             elif symbol is not self.empty:
                 key = type
                 if key == 'INEQ':
                     right_part = tokens[match[1]]
-                    prompt_2 = self.parameters[key]['prompt_2a'] + " " + symbol + " " + right_part + " " + self.parameters[key]['prompt_2_b'] + " " + search_context
                 elif key == 'EQ':
-                    prompt_2 = self.parameters[key]['prompt_2a'] + " " + symbol + " " + self.parameters[key]['prompt_2_b'] + " " + search_context
+                    right_part = "True" if symbol == "==" else "False"
+                    symbol = "=="
             else:
                 key = None
                 component = "PLACEHOLDER == True"
 
             if key:
-                # Create missing prompts
-                system_prompt, prompt_1, response_1 = self._build_messages(key)
-
                 # Get response
-                component = self.get_openai_response(system_prompt, prompt_1, response_1, prompt_2, estimation_mode)
+                component = self.get_openai_response(key, symbol, right_part, search_context, estimation_mode)
+
+                # Handle logical induced negations after the extraction, since the negation is not directly triggered by the text but rather by the constraint structure
+                if negated and symbol is not self.empty:
+                    old_symbol = symbol
+                    neg_symbol = self.negations[symbol]
+                    
+                    if old_symbol == "==":
+                        if 'False' in component:
+                            component.replace('False', 'True')
+                        elif 'True' in component:
+                            component.replace('True', 'False')
+                    elif old_symbol in component:
+                        component.replace(old_symbol, neg_symbol)
 
         return component
     
-    def _build_messages(self, key):
-        """
-        Helper function to construct parts of the conversation with the key. 
-        :param key: Determines the case.
-        :return: Parts of the conversation.
-        """
-        system_prompt = self.parameters[key]['system_prompt']
-        prompt_1 = self.parameters[key]['prompt_1']
-        response_1 = self.parameters[key]['response_1']
-        
-        return system_prompt, prompt_1, response_1
-    
-    def get_openai_response(self, system_prompt="", prompt_1="", response_1="", prompt_2="", estimation_mode=True, output_estimate = 10, safety = 1.2):
+    def get_openai_response(self, key, symbol, right_part, search_context, estimation_mode=True, output_estimate = 10, safety = 1.2):
         """
         Extracts a response from a given text using a predefined template and the OpenAI GPT API. Calculates the resource usage in terms of input and output tokens, including their associated costs.
 
-        :param system_prompt: The initial prompt explaining the task to the AI model.
-        :param prompt_1: The first user prompt, containing a template and a text to extract data from.
-        :param response_1: The assistant's response to the first prompt, demonstrating how to fit the output into the template.
-        :param prompt_2: The second user prompt, similar to the first but with different content and template requirements.
+        :param key: Determines the case.
+        :param symbol: Equation symbol.
+        :param right_part: Right part of the equation.
+        :param search_context: The text from which the constraint component should be extracted.
         :param estimation_mode: Determines if the requests are sent to the OpenAI API (False) or if a plain cost calculation is performed (True), using an estimate for the number of output tokens.
         :param output_estimate: Estimate for the number of output tokens, if mode is 'sim'. 
         :param safety: Safety factor to multiply the total number of tokens with.
@@ -1229,6 +1226,11 @@ class ConstraintBuilder:
         response_2 = ""
 
         # Construct conversation
+        system_prompt = self.parameters['general_prompts']['system_prompt']
+        prompt_1 = self.parameters[key]['prompt_1']
+        response_1 = self.parameters[key]['response_1']
+        prompt_2 = self.parameters['general_prompts']['prompt_2_a'] + " " + symbol + " " + right_part + " " + self.parameters['general_prompts']['prompt_2_b'] + " " + search_context
+
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt_1},
@@ -1248,10 +1250,6 @@ class ConstraintBuilder:
         
         else:
             client = OpenAI()
-            
-            print()
-            print("OPENAI API CALLED")
-            print()
 
             completion = client.chat.completions.create(
                 model=params['model'],
