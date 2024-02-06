@@ -1,6 +1,4 @@
-import os
 import re
-import pickle
 import numerizer
 from termcolor import colored
 import pandas as pd
@@ -12,17 +10,22 @@ class Preprocessor:
     """
     Class for reading .txt files, preprocessing the text, and splitting into sentences, while also extracting enumeration details.
     """
-    def __init__(self, nlp, input_file_paths, verbose):
+    def __init__(self, nlp, parameters, linebreak, input_file_paths, verbose):
         """
         Initializes the Preprocessor.
 
         :param nlp: An instance of a spaCy Language model used for processing text.
+        :param parameters: A dictionary containing various settings and parameters for preprocessing.
+        :param linebreak: The character replacing a linebreak to split into chunks.
         :param file_paths: A dictionary with the paths to the .txt input files.
         :param verbose: Parameter to control the printed output. If True, output is printed.
         """
         self.nlp = nlp
+        self.parameters = parameters
+        self.linebreak = linebreak
         self.file_paths = input_file_paths
         self.verbose = verbose
+        self.stop_word_changes = {}
 
     def txt_to_df(self, file_path, section_start="# ", subsection_start="## "):
         """
@@ -71,7 +74,7 @@ class Preprocessor:
 
         return pd.DataFrame(data)
 
-    def rplc_and_rmv(self, text, replace, remove, space=True):
+    def replace_and_remove(self, text, replace, remove, space=True):
         """
         Replaces and removes literals in the text. 
 
@@ -94,19 +97,15 @@ class Preprocessor:
 
         return text
     
-    def chng_stpwrds(self, add=[],remove=[],remove_numbers=False,restore_default=False, default_filename = '_stopwords_changes.pickle'):
+    def change_stop_words(self, add=[],remove=[],remove_numbers=False,restore_default=False):
         """
         Adds and removes stop words to/from the default set in SpaCy, with options to save/restore customizations.
 
         :param add: Stop words to add, e.g. ["by", "the"].
         :param remove: Stop words to remove, e.g. ["to", "one"].
         :param remove_numbers: Flag to remove all numbers in natural language from the stop words list.
-        :param restore_default: Flag to restore the default stop word selection provided by SpaCy. 
-        :param default_filename: Name of the file with the default stop words. Only relevant if restore_default == True.
-        :return: Stop words.
+        :param restore_default: Flag to restore the default stop word selection provided by SpaCy.
         """
-        pickle_path = os.path.join(os.getcwd(), default_filename)
-
         if not restore_default:
             if remove_numbers:
                 stpwrds = sorted(STOP_WORDS)
@@ -118,20 +117,13 @@ class Preprocessor:
                         if self.verbose:
                             print(item, "successfuly added to removal list!")
             
-            with open(pickle_path, 'wb') as file:
-                pickle.dump({'add': add, 'remove': remove}, file)
+            self.stop_word_changes = {'add': add, 'remove': remove}
+
         else:
             # Restore default by inverting saved additions and removals
-            if os.path.exists(pickle_path):
-                with open(pickle_path, 'rb') as file:
-                    changes = pickle.load(file)
-                # Invert the add and remove lists
-                add, remove = changes['remove'], changes['add']
-
-                # Delete the file after restoring defaults
-                os.remove(pickle_path)
-                if self.verbose:
-                    print("Restored default stop words and deleted the backup file.")
+            add, remove = self.stop_word_changes['remove'], self.stop_word_changes['add']
+            if self.verbose:
+                print("Restored default stop words and deleted the backup file.")
             else:
                 if self.verbose:
                     print("No saved stop words changes to restore.")
@@ -156,9 +148,8 @@ class Preprocessor:
             print("\nSTOPWORDS:",len(stpwrds),"\n")
             for word in stpwrds:
                 print(word)
-        return stpwrds
 
-    def lmtz_and_rmv_stpwrds(self, text):
+    def lemmatize_and_remove_stop_words(self, text):
         """
         Remove stop words and lemmatize text. This function also tracks if the token was originally followed by a line break.
         Parts of the code taken from https://github.com/explosion/spaCy/issues/7735. 
@@ -415,19 +406,16 @@ class Preprocessor:
 
         return summary
 
-    def optimized_preprocessing(self, replace, remove, linebreak, enum_patterns, enum_patterns_spacy):
+    def optimized_preprocessing(self):
         """
         An optimized function that combines reading a dictionary of files, preprocessing the text, and splitting into sentences, while also extracting enumeration details.
 
-        :param replace: Mapping of strings to replace.
-        :param remove: List of strings to remove.
-        :param linebreak: The character replacing a linebreak to split into chunks.
-        :param enum_patterns: Dictionary of enumeration patterns as a regular expression to match against tokens.
-        :param enum_patterns_spacy: Dictionary of enumeration patterns as a spaCy pattern to match against tokens.
         :return: Dictionary with one DataFrame for each file containing the preprocessed texts.
         """
-
         data = {}
+
+        # Add and remove custom stop words to enable the matching
+        self.change_stop_words(add=self.parameters['add_stop_words'],remove=self.parameters['non_stop_words'], remove_numbers=True)
 
         for case, path in self.file_paths.items():
 
@@ -435,17 +423,17 @@ class Preprocessor:
             
             for index, row in df.iterrows():
                 # Removing and replacing special characters
-                processed_text = self.rplc_and_rmv(row['Raw'], replace, remove)
+                processed_text = self.replace_and_remove(row['Raw'], self.parameters['replace'], self.parameters['remove'])
                 # Splitting into chunks
-                chunks = self.split_to_chunks(processed_text, enum_patterns, linebreak)
+                chunks = self.split_to_chunks(processed_text, self.parameters['enum_patterns_regex'], self.linebreak)
                 df.at[index, 'Chunks'] = chunks
                 # Check if chunks is not empty
                 if chunks:
                     # Lemmatizing and removing stop words
-                    results = [self.lmtz_and_rmv_stpwrds(chunk) for chunk in chunks]
+                    results = [self.lemmatize_and_remove_stop_words(chunk) for chunk in chunks]
                     lemmatized_chunks, alignments, succeding_linebreaks = zip(*results)
                     # Analyzing the enumeration structure
-                    enumeration_details = [self.get_enum_details(chunk, linebreaks, enum_patterns_spacy) for chunk, linebreaks in zip(lemmatized_chunks, succeding_linebreaks)]
+                    enumeration_details = [self.get_enum_details(chunk, linebreaks, self.parameters['enum_patterns_spacy']) for chunk, linebreaks in zip(lemmatized_chunks, succeding_linebreaks)]
                 else:
                     # Empty chunks
                     lemmatized_chunks, alignments, succeding_linebreaks, enumeration_details = [], [], [], []
@@ -456,5 +444,8 @@ class Preprocessor:
                 df.at[index, 'Enumeration'] = enumeration_details
             
             data[case] = df
+        
+        # Restore the default set of stop words for the rule-based constraint building
+        self.change_stop_words(restore_default=True)
 
         return data

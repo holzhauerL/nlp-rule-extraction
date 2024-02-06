@@ -498,6 +498,9 @@ class MetaConstraintSearcher(ConstraintSearcher):
 
         if 'match_start' in columns_to_keep:
             constraints_df['match_start'] = constraints_df['match'].apply(lambda x: x[0][0] if isinstance(x[0], tuple) else x[0]).astype(int)
+
+        if 'enum_item_end' in columns_to_keep:
+            constraints_df['enum_item_end'] = constraints_df['match'].apply(lambda x: x[0][1] if isinstance(x[0], tuple) else 0).astype(int)
         
         if 'match_end' in columns_to_keep:
             constraints_df['match_end'] = constraints_df['match'].apply(lambda x: x[1]).astype(int)
@@ -628,7 +631,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
         first_id = constraints['id'][0]
 
         # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
-        constraints_df = self._dict_to_df(constraints, columns_to_keep = ['id', 'type', 'match_start', 'match_end', 'pattern', 'level', 'context_start', 'context_end'])
+        constraints_df = self._dict_to_df(constraints, columns_to_keep = ['id', 'type', 'match_start', 'match_end', 'enum_item_end', 'pattern', 'level', 'context_start', 'context_end'])
 
         # Create the idx_map dictionary
         idx_map = {old_idx: old_idx for old_idx in constraints_df.index}
@@ -689,8 +692,8 @@ class MetaConstraintSearcher(ConstraintSearcher):
             else:
                 exception = True
                 connector = self.parameters["connector_exception_pattern"][self.nlp.vocab.strings[match_id].lower().replace("_", " ")][1]
-                # Check if there is an encompassing enumeration constraint
-                enum_idx = constraints_df[(constraints_df['context_start'] < start) & (constraints_df['context_end'] > end) & (constraints_df['pattern'].str.contains("ENUM"))].index
+                # Check if there is an encompassing enumeration constraint, but make sure that the found connector is not part of the enumeration item or that it is at the end of the enumeration constraint
+                enum_idx = constraints_df[(constraints_df['context_start'] < start) & (constraints_df['context_end'] > end) & (constraints_df['pattern'].str.contains("ENUM")) & (start > constraints_df['enum_item_end'])].index
                 # Only consider those exceptions within the context of an enumeration item
                 if not enum_idx.empty:
                     left_idx = right_idx = enum_idx[0]
@@ -1440,18 +1443,28 @@ def get_constraints_from_data(nlp, data, equality_params, inequality_params, met
         print(delimiter_line, "\n")
 
         total_constraint_items = total_input_costs = total_output_costs = 0
+        table_data = []
+
         for case, c in constraints.items():
-            total_constraint_items += len(c['id'])
-            total_input_costs += sum(c['resources']['input_costs'])
-            total_output_costs += sum(c['resources']['output_costs'])
-            print(case)
-            print(f"CONSTRAINT COMPONENTS: {len(c['id'])}")
-            print(f"COST - INPUT: $ {sum(c['resources']['input_costs'])}")
-            print(f"COST - OUTPUT: $ {sum(c['resources']['output_costs'])}")
-        print()
-        print("TOTAL")
-        print(f"CONSTRAINT COMPONENTS: {total_constraint_items}")
-        print(f"COST - INPUT: $ {total_input_costs}")
-        print(f"COST - OUTPUT: $ {total_output_costs}")
+            num_components = len(c['id'])
+            input_costs = sum(c['resources']['input_costs'])
+            output_costs = sum(c['resources']['output_costs'])
+            
+            # Update totals
+            total_constraint_items += num_components
+            total_input_costs += input_costs
+            total_output_costs += output_costs
+            
+            # Append data for each case to the table data list
+            table_data.append([case, num_components, input_costs, output_costs])
+
+        # Append total row to the table data
+        table_data.append(["TOTAL", total_constraint_items, total_input_costs, total_output_costs])
+
+        # Define headers
+        headers = ["CASE", "CONSTRAINT COMPONENTS", "COST - INPUT", "COST - OUTPUT"]
+
+        # Print table
+        print(tabulate(table_data, headers=headers, tablefmt="grid"))
 
     return constraints
