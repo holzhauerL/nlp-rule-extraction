@@ -981,7 +981,7 @@ class ConstraintBuilder:
         build_mode = self.parameters["build_mode"]
 
         i = 0
-        open_parantheses = 0
+        open_parentheses = 0
         
         while True:
             type = constraints['type'][i]
@@ -994,7 +994,7 @@ class ConstraintBuilder:
                 # First enumeration item
                 if not (level_history):
                     constraint += "("
-                    open_parantheses += 1
+                    open_parentheses += 1
                 # Not the first item, but same level as before
                 elif level == level_history[-1]:
                     constraint += ") " + connector + " (" 
@@ -1005,11 +1005,11 @@ class ConstraintBuilder:
                         constraint += "(("
                     else: 
                         constraint += " " + self.con_and + " ((" 
-                    open_parantheses += 2
+                    open_parentheses += 2
                 # Not the first item, one level shallower
                 elif level < level_history[-1]:
                     constraint += "))) " + connector + " ("
-                    open_parantheses -= 2
+                    open_parentheses -= 2
                 # Save current level
                 level_history.append(level)
 
@@ -1049,7 +1049,7 @@ class ConstraintBuilder:
 
             i += 1
             if i == number_of_components:
-                constraint += ")"*open_parantheses
+                constraint += ")"*open_parentheses
                 break
 
         formatted_constraint.append((step, constraint))
