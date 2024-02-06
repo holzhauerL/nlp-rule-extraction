@@ -5,6 +5,7 @@ from termcolor import colored
 import pandas as pd
 from spacy.matcher import Matcher
 from spacy import displacy
+from openai import OpenAI
 
 class ConstraintSearcher:
     """
@@ -933,15 +934,18 @@ class ConstraintBuilder:
     """
     Class for constraint building based on the constraint items.
     """
-    def __init__(self, nlp, verbose=False):
+    def __init__(self, nlp, parameters, verbose=False):
         """
         Initializes the ConstraintBuilder.
 
         :param nlp: An instance of a spaCy Language model used for processing text.
-        :param verbose: Parameter to control the visualisation of the dependency tree and the entities. If True, visualisation is generated. Default is False.
+        :param parameters: A dictionary containing settings and parameters for the ConstraintBuilder. 
+        :param verbose: Parameter to control the visualisation of the dependency tree and the entities. If True, visualisation is generated. 
         """
         self.nlp = nlp
+        self.parameters = parameters
         self.verbose = verbose
+        self.resources = {'input_tokens':[], 'output_tokens':[], 'input_costs':[], 'output_costs':[]}
         self.con_follow = "FOLLOW"
         self.con_start = "START"
         self.con_end = "END"
@@ -971,6 +975,7 @@ class ConstraintBuilder:
         step = f"STEP_{random_integer}"
         level_history = []
         number_of_components = len(constraints['id'])
+        build_mode = self.parameters["build_mode"]
 
         i = 0
         open_parantheses = 0
@@ -1017,21 +1022,21 @@ class ConstraintBuilder:
                     connector = constraints['successor'][i+2][1]
                     connector_neg = self.con_or if connector == self.con_and else self.con_and 
                     # First, add ELSE (negated IF)
-                    constraint += "((" + self.build_component(text, constraints, i+1, negated=True) + " " + connector_neg + " " + self.build_component(text, constraints, i+4, negated=True)
+                    constraint += "((" + self.build_component(text, constraints, i+1, build_mode=build_mode, negated=True) + " " + connector_neg + " " + self.build_component(text, constraints, i+4, build_mode=build_mode, negated=True)
                     # Add connector
                     constraint += ") " + self.con_or + " "
                     # Add THEN (IF can be skipped, since connected with OR)
-                    constraint += self.build_component(text, constraints, i+5) + ")"
+                    constraint += self.build_component(text, constraints, i+5, build_mode=build_mode) + ")"
                     # Skip the already processed items
                     i += 5
                 # Default case
                 elif i + 2 < number_of_components:
                     # First, add ELSE (negated IF)
-                    constraint += "(" + self.build_component(text, constraints, i+1, negated=True)
+                    constraint += "(" + self.build_component(text, constraints, i+1, build_mode=build_mode, negated=True)
                     # Add connector
                     constraint += " " + self.con_or + " "
                     # Add THEN (IF can be skipped, since connected with OR)
-                    constraint += self.build_component(text, constraints, i+2) + ")"
+                    constraint += self.build_component(text, constraints, i+2, build_mode=build_mode) + ")"
                     # Skip the already processed items
                     i += 2
 
@@ -1072,18 +1077,21 @@ class ConstraintBuilder:
 
         return filtered_tokens
 
-    def build_component(self, text, constraints, i, negated=False, keep_tokens=4):
+    def build_component(self, text, constraints, i, build_mode='rules', negated=False, keep_tokens=4):
         """
-        Rule-based building of the constraint components.
+        Building of the constraint components, with the options to do it either rule-based or with a GPT of OpenAI.
 
         :param text: The text to search within for constraints.
         :param constraints: A dictionary with detailed information about the found constraints.
         :param i: Index in the constraint dict.
+        :param build_mode: Determines if the components are build using a rule-based approach ('rules') or with a GPT of OpenAI ('openai').
         :param negated: Flag to determine if a negation should be performed (additional to negations triggered by matches).
         :param keep_tokens: Number of tokens to keep.
-        :return: One single constraint component. 
+        :return: One single constraint component.
         """
-        tokens = text.split()
+        component = ""
+
+        estimation_mode = self.parameters["estimation_mode"]
         
         type = constraints['type'][i]
         pattern = constraints['pattern'][i]
@@ -1091,70 +1099,180 @@ class ConstraintBuilder:
         match = constraints['match'][i]
         symbol = constraints['symbol'][i]
 
-        if negated and symbol is not self.empty:
-            symbol = self.negations[symbol]
+        tokens = text.split()
 
-        # For BOOL
-        if 'BOOL' in pattern:
-            # To prevent != True
-            right_part = "True" if symbol == "==" else "False"
-            symbol = "=="
-
-            indices = list(range(match[0],match[1]+1))
-            filtered_tokens = self._get_subset(tokens, indices)
-            
-            # Going from the end to the beginning, check the number of tokens to keep to the end of doc_left
-            filtered_tokens = filtered_tokens[-keep_tokens:]
-
-            # Construct left_part from filtered tokens
-            left_part = "_".join(filtered_tokens)
-
-        # For coherent INEQ and EQ and patterns
-        elif symbol is not self.empty:
-
-            # Define the indices to keep the relation to the original token
-            indices_left = list(range(context[0],match[0]))
-            indices_right = list(range(match[1]+1,context[1]+1))
-            # Get the tokens left and right of the match
-            filtered_tokens_left = self._get_subset(tokens, indices_left)
-            filtered_tokens_right = self._get_subset(tokens, indices_right)
-
-            # Going from the end to the beginning, check the number of tokens to keep to the end of doc_left
-            filtered_tokens_left = filtered_tokens_left[-keep_tokens:] 
-
-            # For general INEQ
-            if type == 'INEQ':
-                
-                # The reference value
-                right_part = tokens[match[1]]
-
-                # If the left_array has not yet the number of tokens to keep, use doc_right
-                if len(filtered_tokens_left) < keep_tokens:
-                    # Add to the array without exceeding the number of tokens to keep in total
-                    additional_tokens_needed = keep_tokens - len(filtered_tokens_left)
-                    filtered_tokens_left.extend(filtered_tokens_right[:additional_tokens_needed])
-
-                filtered_tokens = filtered_tokens_left
-
-                # Construct left_part from filtered tokens
-                left_part = "_".join(filtered_tokens)
-
-            # For general EQ
-            if type == 'EQ':
-
-                filtered_tokens_right = filtered_tokens_right[:keep_tokens] 
-
-                left_part = "_".join(filtered_tokens_left)
-                right_part = "_".join(filtered_tokens_right)
-
-        else:
-            left_part = "PLACEHOLDER"
-            right_part = "True"
-        
         # doc = self.nlp(subset_left + " " + subset_right)
         # displacy.render(doc, style='dep', jupyter=True)
 
-        return left_part + " " + symbol + " " + right_part
+        if negated and symbol is not self.empty:
+            symbol = self.negations[symbol]
+        
+        if build_mode == 'rules':
+            # For BOOL
+            if 'BOOL' in pattern:
+                # To prevent != True
+                right_part = "True" if symbol == "==" else "False"
+                symbol = "=="
+
+                indices = list(range(match[0],match[1]+1))
+
+                filtered_tokens = self._get_subset(tokens, indices)
+                # Going from the end to the beginning, check the number of tokens to keep to the end of doc_left
+                filtered_tokens = filtered_tokens[-keep_tokens:]
+                # Construct left_part from filtered tokens
+                left_part = "_".join(filtered_tokens)
+
+            # For coherent INEQ and EQ and patterns
+            elif symbol is not self.empty:
+
+                # Define the indices to keep the relation to the original token
+                indices_left = list(range(context[0],match[0]))
+                indices_right = list(range(match[1]+1,context[1]+1))
+                # Get the tokens left and right of the match
+                filtered_tokens_left = self._get_subset(tokens, indices_left)
+                filtered_tokens_right = self._get_subset(tokens, indices_right)
+
+                # Going from the end to the beginning, check the number of tokens to keep to the end of doc_left
+                filtered_tokens_left = filtered_tokens_left[-keep_tokens:] 
+
+                # For general INEQ
+                if type == 'INEQ':
+                    
+                    # The reference value
+                    right_part = tokens[match[1]]
+
+                    # If the left_array has not yet the number of tokens to keep, use doc_right
+                    if len(filtered_tokens_left) < keep_tokens:
+                        # Add to the array without exceeding the number of tokens to keep in total
+                        additional_tokens_needed = keep_tokens - len(filtered_tokens_left)
+                        filtered_tokens_left.extend(filtered_tokens_right[:additional_tokens_needed])
+
+                    filtered_tokens = filtered_tokens_left
+
+                    # Construct left_part from filtered tokens
+                    left_part = "_".join(filtered_tokens)
+
+                # For general EQ
+                if type == 'EQ':
+
+                    filtered_tokens_right = filtered_tokens_right[:keep_tokens] 
+
+                    left_part = "_".join(filtered_tokens_left)
+                    right_part = "_".join(filtered_tokens_right)
+
+            else:
+                left_part = "PLACEHOLDER"
+                symbol = "=="
+                right_part = "True"
+
+            component = left_part + " " + symbol + " " + right_part
+
+        elif build_mode == 'openai':
+            indices = list(range(context[0],context[1]+1))
+            search_context = " ".join([tokens[idx] for idx in indices])
+
+            # For BOOL
+            if 'BOOL' in pattern:
+                key = 'BOOL'
+                # To prevent != True
+                right_part = "True" if symbol == "==" else "False"
+                symbol = "=="
+                prompt_2 = self.parameters[key]['prompt_2_a'] + " " + symbol + " " + right_part + " " + self.parameters[key]['prompt_2_b'] + " " + search_context
+            
+            # For coherent INEQ and EQ and patterns
+            elif symbol is not self.empty:
+                key = type
+                if key == 'INEQ':
+                    right_part = tokens[match[1]]
+                    prompt_2 = self.parameters[key]['prompt_2a'] + " " + symbol + " " + right_part + " " + self.parameters[key]['prompt_2_b'] + " " + search_context
+                elif key == 'EQ':
+                    prompt_2 = self.parameters[key]['prompt_2a'] + " " + symbol + " " + self.parameters[key]['prompt_2_b'] + " " + search_context
+            else:
+                key = None
+                component = "PLACEHOLDER == True"
+
+            if key:
+                # Create missing prompts
+                system_prompt, prompt_1, response_1 = self._build_messages(key)
+
+                # Get response
+                component = self.get_openai_response(system_prompt, prompt_1, response_1, prompt_2, estimation_mode)
+
+        return component
+    
+    def _build_messages(self, key):
+        """
+        Helper function to construct parts of the conversation with the key. 
+        :param key: Determines the case.
+        :return: Parts of the conversation.
+        """
+        system_prompt = self.parameters[key]['system_prompt']
+        prompt_1 = self.parameters[key]['prompt_1']
+        response_1 = self.parameters[key]['response_1']
+        
+        return system_prompt, prompt_1, response_1
+    
+    def get_openai_response(self, system_prompt="", prompt_1="", response_1="", prompt_2="", estimation_mode=True, output_estimate = 10, safety = 1.2):
+        """
+        Extracts a response from a given text using a predefined template and the OpenAI GPT API. Calculates the resource usage in terms of input and output tokens, including their associated costs.
+
+        :param system_prompt: The initial prompt explaining the task to the AI model.
+        :param prompt_1: The first user prompt, containing a template and a text to extract data from.
+        :param response_1: The assistant's response to the first prompt, demonstrating how to fit the output into the template.
+        :param prompt_2: The second user prompt, similar to the first but with different content and template requirements.
+        :param estimation_mode: Determines if the requests are sent to the OpenAI API (False) or if a plain cost calculation is performed (True), using an estimate for the number of output tokens.
+        :param output_estimate: Estimate for the number of output tokens, if mode is 'sim'. 
+        :param safety: Safety factor to multiply the total number of tokens with.
+        :return: A tuple containing the assistant's response to the second prompt and a dictionary with resource usage details.
+        """
+        params = self.parameters['openai_params']
+        response_2 = ""
+
+        # Construct conversation
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt_1},
+            {"role": "assistant", "content": response_1},
+            {"role": "user", "content": prompt_2}
+        ]
+
+        if estimation_mode:
+            response_2 = "ESTIMATION MODE"
+
+            # Concatenate all the string objects in messages, using keys and values
+            text = ''.join([f"{message['role']}: {message['content']}" for message in messages])
+            doc = self.nlp(text)
+            # The number of tokens in the doc
+            input_tokens = len(doc) * safety
+            output_tokens = output_estimate * safety
+        
+        else:
+            client = OpenAI()
+            
+            print()
+            print("OPENAI API CALLED")
+            print()
+
+            completion = client.chat.completions.create(
+                model=params['model'],
+                messages=messages
+            )
+            response_2 = completion.choices[0].message.content
+
+            usage = dict(completion).get('usage')
+            input_tokens = usage.prompt_tokens
+            output_tokens = usage.completion_tokens
+
+        # Cost calculation
+        input_costs = params['input_price'] * input_tokens / 1000
+        output_costs = params['output_price'] * output_tokens / 1000
+
+        self.resources['input_tokens'].append(input_tokens)
+        self.resources['output_tokens'].append(output_tokens)
+        self.resources['input_costs'].append(input_costs)
+        self.resources['output_costs'].append(output_costs)
+
+        return response_2
 
     def streamline(self, formatted_constraints):
         """
@@ -1253,7 +1371,7 @@ def get_constraints(nlp, builder, text, equality_params, inequality_params, meta
 
     return constraints, id
 
-def get_constraints_from_data(nlp, data, equality_params, inequality_params, meta_params, verbose=True):
+def get_constraints_from_data(nlp, data, equality_params, inequality_params, meta_params, builder_params, verbose=True):
     """
     Conducts a combined search for inequality, equality and meta constraints and builds the constraints for all use cases.
 
@@ -1264,10 +1382,11 @@ def get_constraints_from_data(nlp, data, equality_params, inequality_params, met
     :param equality_params: Parameters for the EqualityConstraintSearcher.
     :param inequality_params: Parameters for the InequalityConstraintSearcher.
     :param meta_params: Parameters for the MetaConstraintSearcher.
+    :param builder_params: Parameters for the ConstraintBuilder.
     :param verbose: Parameter to control the printed output. If True, output is printed.
     :return constraints: A dictionary with detailed information about the found constraints. 
     """
-    builder = ConstraintBuilder(nlp, verbose)
+    builder = ConstraintBuilder(nlp, builder_params, verbose)
 
     delimiter_line = "+"*80
     constraints_tmp = defaultdict(lambda: defaultdict(list)) # Enable dict assignment before knowing the keys
@@ -1280,6 +1399,9 @@ def get_constraints_from_data(nlp, data, equality_params, inequality_params, met
             print(use_case.upper(), "\n")
             print(delimiter_line)
             print(delimiter_line, "\n")
+
+        # Reset the resources
+        builder.resources = {'input_tokens':[], 'output_tokens':[], 'input_costs':[], 'output_costs':[]}
 
         id = 1  # Initialize ID for each use case
         for index, row in df.iterrows(): # Iterate over the rows in the dataframe
@@ -1303,6 +1425,7 @@ def get_constraints_from_data(nlp, data, equality_params, inequality_params, met
         
         # Streamline process steps and IDs of the formatted constraints
         constraints_tmp[use_case]['formatted'] = builder.streamline(constraints_tmp[use_case]['formatted'])
+        constraints_tmp[use_case]['resources'] = builder.resources
 
 
     # Format to regular dict
@@ -1314,15 +1437,23 @@ def get_constraints_from_data(nlp, data, equality_params, inequality_params, met
         print()
         print(delimiter_line)
         print(delimiter_line, "\n")
-        print("SUMMARY OF CONSTRAINT ITEMS\n")
+        print("SUMMARY\n")
         print(delimiter_line)
         print(delimiter_line, "\n")
 
-        total_constraint_items = 0
+        total_constraint_items = total_input_costs = total_output_costs = 0
         for case, c in constraints.items():
             total_constraint_items += len(c['id'])
-            print(f"{len(c['id'])}", ":" , case)
+            total_input_costs += sum(c['resources']['input_costs'])
+            total_output_costs += sum(c['resources']['output_costs'])
+            print(case)
+            print(f"CONSTRAINT COMPONENTS: {len(c['id'])}")
+            print(f"COST - INPUT: $ {sum(c['resources']['input_costs'])}")
+            print(f"COST - OUTPUT: $ {sum(c['resources']['output_costs'])}")
         print()
-        print(total_constraint_items, ": TOTAL")
+        print("TOTAL")
+        print(f"CONSTRAINT COMPONENTS: {total_constraint_items}")
+        print(f"COST - INPUT: $ {total_input_costs}")
+        print(f"COST - OUTPUT: $ {total_output_costs}")
 
     return constraints
