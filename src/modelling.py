@@ -21,7 +21,7 @@ class ConstraintSearcher:
         """
         self.nlp = nlp
         self.parameters = parameters
-        self.constraints = {'id': [], 'type': [], 'match': [], 'pattern': [], 'exception': [], 'negation': [], 'symbol': [],  'level': [], 'predecessor': [], 'successor': [], 'context': []}
+        self.constraints = {'id': [], 'type': [], 'match': [], 'pattern': [], 'exception': [], 'negation': [], 'symbol': [],  'level': [], 'successor': [], 'context': []}
         self.type = None
         self.empty = "NA"
         self.con_follow = "FOLLOW"
@@ -30,7 +30,7 @@ class ConstraintSearcher:
         self.con_and = "AND"
         self.con_or = "OR"
 
-    def _add_constraint(self, id, match=None, pattern=None, exception=None, negation=None, symbol=None, level=None, connector_pre=None, connector_suc=None, context=None):
+    def _add_constraint(self, id, match=None, pattern=None, exception=None, negation=None, symbol=None, level=None, connector_suc=None, context=None):
         """
         Adds a new constraint to the constraints dictionary.
 
@@ -43,7 +43,6 @@ class ConstraintSearcher:
         :param negation: Indicates if there is a negation in the constraint.
         :param symbol: Symbol representing the constraint.
         :param level: The level of an enumeration constraint.
-        :param connector_pre: The connection of the predecessor to the constraint.
         :param connector_suc: The connection of the successor to the constraint.
         :param context: The span indicating the context for the ConstraintBuilder.
         """
@@ -55,7 +54,6 @@ class ConstraintSearcher:
         self.constraints['negation'].append(negation if negation is not None else self.empty)
         self.constraints['symbol'].append(symbol if symbol is not None else self.empty)
         self.constraints['level'].append(level if level is not None else self.empty)
-        self.constraints['predecessor'].append((id-1, connector_pre))
         self.constraints['successor'].append((id+1, connector_suc))
         self.constraints['context'].append(context if context is not None else self.empty)
 
@@ -224,9 +222,6 @@ class ConstraintSearcher:
                 is_exception = formatted_match_str in formatted_exception_patterns or \
                             formatted_match_str in {key.upper().replace(" ", "_") for key in exceptions_dict.keys()}
 
-                # Indicate the start of the constraints
-                connector_pre = self.con_start if id == 1 else self.con_follow
-
                 # Handling symbols
                 phrase = match_str.replace("_", " ").lower()
                 symbol = merged_dict.get(phrase, None)
@@ -236,7 +231,7 @@ class ConstraintSearcher:
                 seen_tokens.add(end)
 
                 # Add constraint
-                self._add_constraint(id, match=(start, end-1), pattern=formatted_match_str, exception=is_exception, negation=(negated_token, is_negated), symbol=symbol, connector_pre=connector_pre, connector_suc=self.con_follow)
+                self._add_constraint(id, match=(start, end-1), pattern=formatted_match_str, exception=is_exception, negation=(negated_token, is_negated), symbol=symbol, connector_suc=self.con_follow)
 
                 # Updating the ID
                 id += 1
@@ -387,12 +382,11 @@ class MetaConstraintSearcher(ConstraintSearcher):
                 first_enum_item = False
             
 
-            # Set predecessor and successor
-            connector_pre = self.con_start if id == 1 else logical_connections[level]
+            # Set successor
             connector_suc = logical_connections[level]
 
             # Add constraint
-            self._add_constraint(id, match=((start_token_enumeration, end_token_enumeration),end_token_item), pattern=pattern_names[level], exception=exceptions[level], level=level, connector_pre=connector_pre, connector_suc=connector_suc)
+            self._add_constraint(id, match=((start_token_enumeration, end_token_enumeration),end_token_item), pattern=pattern_names[level], exception=exceptions[level], level=level, connector_suc=connector_suc)
 
             id += 1
 
@@ -439,10 +433,8 @@ class MetaConstraintSearcher(ConstraintSearcher):
 
         for start, (start, end) in processed_matches.items():
 
-            connector_pre = self.con_start if id == 1 else self.con_and
-
             # Add constraint
-            self._add_constraint(id, match=(start, end), pattern=self.nlp.vocab.strings[match_id].upper(), exception=False, negation=(negated_token, is_negated),connector_pre=connector_pre, connector_suc=self.con_and)
+            self._add_constraint(id, match=(start, end), pattern=self.nlp.vocab.strings[match_id].upper(), exception=False, negation=(negated_token, is_negated),connector_suc=self.con_and)
 
             id += 1
 
@@ -478,10 +470,8 @@ class MetaConstraintSearcher(ConstraintSearcher):
 
         for start, (start, reduced_end) in processed_matches.items():
 
-            connector_pre = self.con_start if id == 1 else self.con_and
-
             # Add constraint
-            self._add_constraint(id, match=(start, reduced_end), pattern=self.nlp.vocab.strings[match_id].upper(), exception=False,connector_pre=connector_pre, connector_suc=self.con_and)
+            self._add_constraint(id, match=(start, reduced_end), pattern=self.nlp.vocab.strings[match_id].upper(), exception=False, connector_suc=self.con_and)
 
             id += 1
 
@@ -513,6 +503,9 @@ class MetaConstraintSearcher(ConstraintSearcher):
         
         if 'context_end' in columns_to_keep:
             constraints_df['context_end'] = constraints_df['context'].apply(lambda x: x[1]).astype(int)
+
+        if 'negation' in columns_to_keep:
+            constraints_df['negation'] = constraints_df['negation'].apply(lambda x: x[0]if isinstance(x[0], int) else 0).astype(int)
 
         # Keep only required columns
         constraints_df = constraints_df[columns_to_keep]
@@ -600,7 +593,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
     
     def _update_ids(self, constraints, first_id):
         """ 
-        Updates the ids in 'id', 'predecessor' and 'successor' fields of the constraints dict.
+        Updates the ids in 'id' and 'successor' fields of the constraints dict.
 
         :param constraints: A dictionary with detailed information about the found constraints.
         :param first_id: The id to start with.
@@ -611,10 +604,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
         last_id = first_id + len(constraints['id']) - 1
         constraints['id'] = list(range(first_id, last_id + 1))
 
-        # Update predecessor and successor IDs
-        for i in range(len(constraints['predecessor'])):
-            constraints['predecessor'][i] = (constraints['id'][i]-1, constraints['predecessor'][i][1])
-
+        # Update successor IDs
         for i in range(len(constraints['successor'])):
             constraints['successor'][i] = (constraints['id'][i]+1, constraints['successor'][i][1])
         
@@ -705,7 +695,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
                 new_idx = idx_map[left_idx] + 1
 
                 # Insert new list element at position after new_idx
-                new_element = {'id': 99, 'type': self.type, 'match': (start, end - 1), 'pattern': 'CONNECTOR_' + self.nlp.vocab.strings[match_id], 'exception': exception, 'level': self.empty, 'predecessor': (left_idx, connector), 'successor': (right_idx, connector), 'context': (constraints_df.at[left_idx, 'context_start'], constraints_df.at[right_idx, 'context_end'])}
+                new_element = {'id': 99, 'type': self.type, 'match': (start, end - 1), 'pattern': 'CONNECTOR_' + self.nlp.vocab.strings[match_id], 'exception': exception, 'level': self.empty,'successor': (right_idx, connector), 'context': (constraints_df.at[left_idx, 'context_start'], constraints_df.at[right_idx, 'context_end'])}
 
                 for key in constraints.keys():
                     if key in new_element.keys():
@@ -786,7 +776,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
                         match_end = tmp
 
                     # Insert new list element at position after new_idx
-                    new_element = {'id': 99, 'type': self.type, 'match': (match_start, match_end), 'pattern': 'BOOL', 'exception': False, 'symbol': "==",'level': self.empty, 'predecessor': (98, self.con_follow), 'successor': (100, self.con_follow), 'context': (match_start, match_end)}
+                    new_element = {'id': 99, 'type': self.type, 'match': (match_start, match_end), 'pattern': 'BOOL', 'exception': False, 'symbol': "==",'level': self.empty, 'successor': (100, self.con_follow), 'context': (match_start, match_end)}
                     for key in constraints.keys():
                         if key in new_element.keys():
                             value = new_element[key]
@@ -815,7 +805,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
 
                 if match_end_bool and match_start_bool <= match_end_bool:
                     # Generate new BOOL constraint
-                    new_element = {'id': 99, 'type': self.type, 'match': (match_start_bool, match_end_bool), 'pattern': 'BOOL', 'exception': False, 'symbol': "==",'level': self.empty, 'predecessor': (98, self.con_follow), 'successor': (100, self.con_follow), 'context': (match_start_bool, match_end_bool)}
+                    new_element = {'id': 99, 'type': self.type, 'match': (match_start_bool, match_end_bool), 'pattern': 'BOOL', 'exception': False, 'symbol': "==",'level': self.empty, 'successor': (100, self.con_follow), 'context': (match_start_bool, match_end_bool)}
                     new_elements.append((index, new_element))
 
         # Insert new BOOL constraints
@@ -838,7 +828,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
                 if not encompassing_bool_index.empty:
                     for idx in encompassing_bool_index:
                         # Generate new BOOL
-                        new_element = {'id': 99, 'type': self.type, 'match': (row['match_end']+1, constraints['match'][idx][1]), 'pattern': 'BOOL', 'exception': False, 'symbol': "==",'level': self.empty, 'predecessor': (98, self.con_follow), 'successor': (100, self.con_follow), 'context': (row['match_end']+1, constraints['match'][idx][1])}
+                        new_element = {'id': 99, 'type': self.type, 'match': (row['match_end']+1, constraints['match'][idx][1]), 'pattern': 'BOOL', 'exception': False, 'symbol': "==",'level': self.empty, 'successor': (100, self.con_follow), 'context': (row['match_end']+1, constraints['match'][idx][1])}
                         new_elements.append((index, new_element))
                         # Update match and context for encompassing BOOL (only one entry in index array)
                         constraints['match'][idx] = constraints['context'][idx] = (constraints['context'][idx][0], row['match_start']-1)
@@ -858,13 +848,14 @@ class MetaConstraintSearcher(ConstraintSearcher):
         first_id = constraints['id'][0]
 
         # Create a DataFrame with the subset of the columns necessary for the checks to reduce runtime
-        constraints_df = self._dict_to_df(constraints, columns_to_keep = ['id', 'type', 'match_start', 'match_end', 'pattern', 'level', 'context_start', 'context_end'])
+        constraints_df = self._dict_to_df(constraints, columns_to_keep = ['id', 'type', 'match_start', 'match_end', 'pattern', 'level', 'context_start', 'context_end', 'negation'])
         
         # Sort the constraints by match_start in ascending order
         constraints_df.sort_values(by='match_start', inplace=True)
 
         # Dropping constraints based on specified conditions
         rows_to_drop = []
+        previous_row = None
         for index, row in constraints_df.iterrows():
 
             # Check if a 'BOOL' constraint is encompassing a 'EQ' or 'INEQ' constraint
@@ -875,61 +866,47 @@ class MetaConstraintSearcher(ConstraintSearcher):
 
             # If it is a 'FOR' or 'IF' constraint and there are no enumeration constraints in this chunk 
             if any(x in row['pattern'] for x in ['FOR_', 'IF_']) and not (constraints_df['pattern'].str.contains("ENUM").any()):
-                # Check if there are no 'EQ' or 'INEQ' constraints within the context (incl. the borders) 
+                # Drop if there are no 'EQ' or 'INEQ' constraints within the context (incl. the borders) 
                 subset_df = constraints_df[(constraints_df['match_start'] >= row['context_start']) & (constraints_df['match_start'] <= row['context_end']) & (constraints_df['type'] != 'META') & (~constraints_df.index.isin([index]))]
                 if subset_df.empty:
                     rows_to_drop.append(index)
                     # Find encompassed BOOL constraints to drop
                     bool_indices = constraints_df[(constraints_df['pattern'] == 'BOOL') & (constraints_df['match_end'] <= row['context_end']) & (constraints_df['match_start'] >= row['context_start'])].index
                     rows_to_drop.extend(bool_indices)
-
-            # Check for following 'INEQ' constraints with a matching context_end to match_start        
-            if row['type'] == 'EQ':
-                matching_ineq_indices = constraints_df[(constraints_df['type'] == 'INEQ') & (constraints_df['match_start'] == row['context_end'])].index
-                if not matching_ineq_indices.empty:
-                    # Update context starts for matching INEQ constraints in the original dictionary
-                    for idx in matching_ineq_indices:
-                        constraints['context'][idx] = (row['context_start'], constraints['context'][idx][1])
+                 
+            if row['type'] in ['EQ', 'INEQ'] and previous_row is not None:
+                # Drop last 'EQ' or 'INEQ' if two subsequent constraints of the same type; also check context (to account for linebreaks) and negation
+                if previous_row['type'] == row['type'] and previous_row['context_end'] == row['match_start'] and row['negation'] == 0:
                     rows_to_drop.append(index)
+                    # Update context end for remaining constraint
+                    constraints['context'][previous_index] = (constraints['context'][previous_index][0], row['context_end'])
+
+                # Drop 'EQ' if subsequent 'INEQ'; also check context (to account for linebreaks)
+                elif previous_row['type'] == 'EQ' and row['type'] == 'INEQ' and previous_row['context_end'] == row['match_start']:
+                    rows_to_drop.append(previous_index)
+                    # Update context start for remaining 'INEQ' constraint
+                    constraints['context'][index] = (previous_row['context_start'], constraints['context'][index][1])
+
+            if 'CONNECTOR' in row['pattern']:
+                # Drop two subsequent 'AND' connectors
+                if '_AND' in row['pattern'] and '_AND' in previous_row['pattern']:
+                    rows_to_drop.append(previous_index)
+                    rows_to_drop.append(index)
+                    
+            # Save the previous value
+            previous_row, previous_index = row, index
         
         # Drop the identified rows
-        constraints_df = constraints_df.drop(rows_to_drop)
+        constraints_df = constraints_df.drop(list(set(rows_to_drop)))
 
         # Identify duplicates based on 'pattern', 'match_start', and 'match_end'
         duplicate_rows = constraints_df.duplicated(subset=['pattern', 'match_start', 'match_end'], keep='first')
 
         # Drop the identified duplicate rows
         constraints_df = constraints_df[~duplicate_rows]
-
-        # Drop two subsequent 'CONNECTOR_AND' constraints
-        previous_was_connector = False
-        connector_rows_to_drop = []
-        for index, row in constraints_df.iterrows():
-            if row['pattern'] == 'CONNECTOR_AND':
-                if previous_was_connector:
-                    connector_rows_to_drop.append(index - 1)
-                    connector_rows_to_drop.append(index)
-                previous_was_connector = True
-            else:
-                previous_was_connector = False
-
-        # Drop the marked 'CONNECTOR' constraints
-        constraints_df = constraints_df.drop(connector_rows_to_drop)
         
         for key in constraints:
-            if key in constraints_df:  # To handle keys that are columns in the DataFrame
-                constraints[key] = list(constraints_df[key])
-            else:  # For keys not in the DataFrame, retain original order (if applicable)
-                constraints[key] = [constraints[key][idx] for idx in constraints_df.index]
-
-        # # Update context for non-encompassed constraints
-        # for index, row in constraints_df.iterrows():
-
-        #     overlapping_end_index = constraints_df[(constraints_df['match_start'] < row['context_end']) & (~(constraints_df['match_start'] > row['match_start']) & (constraints_df['match_end'] < row['match_end']))].index
-
-        #     if not overlapping_end_index.empty:
-        #         overlap_idx = overlapping_end_index.min()
-        #         constraints['context'][index] = (constraints['context'][index][0],constraints_df.at[overlap_idx, 'match_start']-1)
+            constraints[key] = [constraints[key][idx] for idx in constraints_df.index]
 
         return self._update_ids(constraints, first_id)
     
@@ -993,8 +970,8 @@ class ConstraintBuilder:
             if 'ENUM' in pattern:
                 # First enumeration item
                 if not (level_history):
-                    constraint += "("
-                    open_parentheses += 1
+                    constraint += "(("
+                    open_parentheses += 2
                 # Not the first item, but same level as before
                 elif level == level_history[-1]:
                     constraint += ") " + connector + " (" 
