@@ -777,6 +777,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
 
                     # Insert new list element at position after new_idx
                     new_element = {'id': 99, 'type': self.type, 'match': (match_start, match_end), 'pattern': 'BOOL', 'exception': False, 'symbol': "==",'level': self.empty, 'successor': (100, self.con_follow), 'context': (match_start, match_end)}
+                    
                     for key in constraints.keys():
                         if key in new_element.keys():
                             value = new_element[key]
@@ -1033,7 +1034,7 @@ class ConstraintBuilder:
 
         return formatted_constraint
     
-    def _get_subset(self, tokens, indices, filter_stop=True, filter_alpha=True, filter_pos=['ADJ', 'NOUN', 'VERB']):
+    def _get_subset(self, tokens, indices, filter_stop=True, filter_alpha=True):
         """
         From the list of tokens, retrieve a subset based on indices. Optionally, filter stop words and tokens with specific POS tags.
 
@@ -1041,9 +1042,9 @@ class ConstraintBuilder:
         :param indices: List of indices, referring to tokens.
         :param filter_stop: Flag to determine filtering of stop words. If True, stop words are filtered out. 
         :param filter_alpha: Flag to determine filtering of alpha characters. If True, only alpha characters are considered.
-        :param filter_pos: List of POS tags to consider for filtering. If empty, no filtering for POS tag is performed. 
         :return: List of subset of tokens, optionally filtered.
         """
+        filter_pos = self.parameters["filter_pos"]
         if filter_stop:
             stop_words = set(self.nlp.Defaults.stop_words)
             subset = " ".join([tokens[idx] for idx in indices if tokens[idx] not in stop_words])
@@ -1057,7 +1058,7 @@ class ConstraintBuilder:
 
         return filtered_tokens
 
-    def build_component(self, text, constraints, i, build_mode='rules', negated=False, keep_tokens=4):
+    def build_component(self, text, constraints, i, build_mode='rules', negated=False):
         """
         Building of the constraint components, with the options to do it either rule-based or with a GPT of OpenAI.
 
@@ -1066,11 +1067,11 @@ class ConstraintBuilder:
         :param i: Index in the constraint dict.
         :param build_mode: Determines if the components are build using a rule-based approach ('rules') or with a GPT of OpenAI ('openai').
         :param negated: Flag to determine if a negation should be performed (additional to negations triggered by matches).
-        :param keep_tokens: Number of tokens to keep.
         :return: One single constraint component.
         """
         component = ""
 
+        keep_tokens = self.parameters["keep_tokens"]
         estimation_mode = self.parameters["estimation_mode"]
         
         type = constraints['type'][i]
@@ -1102,7 +1103,7 @@ class ConstraintBuilder:
                 # Construct left_part from filtered tokens
                 left_part = "_".join(filtered_tokens)
 
-            # For coherent INEQ and EQ and patterns
+            # Coherent INEQ and EQ patterns
             elif symbol is not self.empty:
 
                 # Define the indices to keep the relation to the original token
@@ -1115,7 +1116,7 @@ class ConstraintBuilder:
                 # Going from the end to the beginning, check the number of tokens to keep to the end of doc_left
                 filtered_tokens_left = filtered_tokens_left[-keep_tokens:] 
 
-                # For general INEQ
+                # Coherent INEQ
                 if type == 'INEQ':
                     
                     # The reference value
@@ -1132,18 +1133,17 @@ class ConstraintBuilder:
                     # Construct left_part from filtered tokens
                     left_part = "_".join(filtered_tokens)
 
-                # For general EQ
+                # Coherent EQ
                 if type == 'EQ':
-
+        
                     filtered_tokens_right = filtered_tokens_right[:keep_tokens] 
 
                     left_part = "_".join(filtered_tokens_left)
                     right_part = "_".join(filtered_tokens_right)
 
+            # TODO: INEQ and EQ exceptions
             else:
-                left_part = "PLACEHOLDER"
-                symbol = "=="
-                right_part = "True"
+                left_part = symbol = right_part = ""
 
             component = left_part + " " + symbol + " " + right_part
 
@@ -1158,17 +1158,20 @@ class ConstraintBuilder:
                 right_part = "True" if symbol == "==" else "False"
                 symbol = "=="
             
-            # For coherent INEQ and EQ and patterns
-            elif symbol is not self.empty:
+            # For coherent INEQ and all EQ patterns
+            else:
                 key = type
-                if key == 'INEQ':
+                # Coherent INEQ patterns
+                if key == 'INEQ' and symbol is not self.empty:
                     right_part = tokens[match[1]]
+                # All EQ
                 elif key == 'EQ':
                     right_part = "True" if symbol == "==" else "False"
                     symbol = "=="
-            else:
-                key = None
-                component = "PLACEHOLDER == True"
+                # TODO: INEQ exceptions
+                else:
+                    key = None
+                    component = ""
 
             if key:
                 # Get response
