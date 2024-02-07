@@ -99,12 +99,12 @@ class Preprocessor:
     
     def change_stop_words(self, add=[],remove=[],remove_numbers=False,restore_default=False):
         """
-        Adds and removes stop words to/from the default set in SpaCy, with options to save/restore customizations.
+        Adds and removes stop words to/from the default set in spaCy, with options to save/restore customizations.
 
         :param add: Stop words to add, e.g. ["by", "the"].
         :param remove: Stop words to remove, e.g. ["to", "one"].
         :param remove_numbers: Flag to remove all numbers in natural language from the stop words list.
-        :param restore_default: Flag to restore the default stop word selection provided by SpaCy.
+        :param restore_default: Flag to restore the default stop word selection provided by spaCy.
         """
         if not restore_default:
             if remove_numbers:

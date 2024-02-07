@@ -10,7 +10,7 @@ from openai import OpenAI
 class ConstraintSearcher:
     """
     Base class for searching specific constraint patterns in text using spaCy's Matcher. 
-    Provides a framework to define and search for patterns related to constraints like inequalities or equalities.
+    Provides a framework to define and search for patterns related to constraints like inequalities or equalities. 
     """
     def __init__(self, nlp, parameters):
         """
@@ -314,7 +314,6 @@ class EqualityConstraintSearcher(ConstraintSearcher):
 class MetaConstraintSearcher(ConstraintSearcher):
     """
     A subclass of ConstraintSearcher specifically designed for searching meta constraints in text.
-    Meta constraints encapsulate one or multiple constraints.
     """
     def __init__(self, nlp, parameters):
         """

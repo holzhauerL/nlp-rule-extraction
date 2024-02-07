@@ -32,7 +32,7 @@ class Evaluator:
         Extracts the constraints from the gold standard (GS) .txt file into a dictionary. 
 
         :param file_path: Path to the GS .txt file. 
-        :return: The constraints from the GS in a dictionary. 
+        :return: The constraints from the GS in a dictionary.  
         """
         constraints_gs = {}
 

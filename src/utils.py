@@ -24,9 +24,9 @@ def load_spacy(model):
 
 def load_sbert(model):
     """
-    Loading the S-BERTmodel.
+    Loading the S-BERT model.
 
-    :param model: Name of the pre-trained S-BERT  model. 
+    :param model: Name of the pre-trained S-BERT model. 
     :return: Pre-trained S-BERT model.
     """
     return SentenceTransformer(model)
