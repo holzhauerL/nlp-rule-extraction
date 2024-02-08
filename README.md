@@ -20,28 +20,31 @@ This study tackles the task of extracting and rebuilding constraints from regula
 
 <figure>
     <img src="report/figures/tex/constraint_example.jpg" alt="Figure 1: Example for a complex constraint and different types of constraint markers" style="height: auto; width: 50%; display: block; margin-left: auto; margin-right: auto;">
-    <figcaption style="text-align: center;">Figure 1: Example for a complex constraint and different types of constraint markers</figcaption>
+    <figcaption style="text-align: center;"><strong>Figure 1:</strong> Example for a complex constraint and different types of constraint markers</figcaption>
 </figure>
 
+<hr>
+
 <figure>
-    <figcaption>Figure 2: Precision and recall curves for a rule-based constraint component building with a variable similarity cutoff. Dotted lines indicated the maximal achievable precision/recall.</figcaption>
-    <table>
+    <figcaption><strong>Figure 2:</strong> Precision and recall curves for a rule-based constraint component building with a variable similarity cutoff. Dotted lines indicated the maximal achievable precision/recall.</figcaption>
+    <table style="width: 100%; text-align: center;">
         <tr>
             <td>
                 <figure>
-                    <img src="report/figures/tex/precision_rules.png" alt="Subfigure 1: Precision">
-                    <figcaption>Figure 2.1: Precision</figcaption>
+                    <img src="report/figures/tex/precision_rules.png" alt="Subfigure 1: Precision" style="width: 100%; max-width: 400px; height: auto; display: block; margin-left: auto; margin-right: auto;">
+                    <figcaption><strong>Figure 2.1:</strong> Precision</figcaption>
                 </figure>
             </td>
             <td>
                 <figure>
-                    <img src="report/figures/tex/recall_rules.png" alt="Subfigure 2: Recall">
-                    <figcaption>Figure 2.2: Recall</figcaption>
+                    <img src="report/figures/tex/recall_rules.png" alt="Subfigure 2: Recall" style="width: 100%; max-width: 400px; height: auto; display: block; margin-left: auto; margin-right: auto;">
+                    <figcaption><strong>Figure 2.2:</strong> Recall</figcaption>
                 </figure>
             </td>
         </tr>
     </table>
 </figure>
+
 
 ## [Quick Setup 🚀](#quick-setup-)
 
