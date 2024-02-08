@@ -610,7 +610,7 @@ class MetaConstraintSearcher(ConstraintSearcher):
     
     def insert_connections(self, text, constraints):
         """
-        Searches and inserts connections in between constraints.
+        Searches and inserts connections in between constraints. 
         
         :param text: The text to search within for constraints.
         :param constraints: A dictionary with detailed information about the found constraints.

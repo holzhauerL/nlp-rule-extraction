@@ -9,7 +9,7 @@ For questions please contact leo.holzhauer@tum.de.
 
 1. Clone repo.
 1. Setup venv conda.
-1. Run requirements.txt.
+1. Run requirements.txt. 
 
 During the execution of the script, a pretrained spacy pipeline is used for various tasks, such as tokenization. It is automatically downloaded, if not yet present in your local environment. 
 

@@ -15,7 +15,7 @@ class Evaluator:
         """
         Initializes the Evaluator.
 
-        :param model: S-BERT model to use for similarity scores.
+        :param model: S-BERT model to use for similarity scores. 
         :param constraints: A dictionary with detailed information about the found constraints.
         :param parameters: A dictionary containing various settings and parameters for constraint searching.
         :param gs_file_paths: A dictionary with the paths to the .txt gold standard files.

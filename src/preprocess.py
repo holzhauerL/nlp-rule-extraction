@@ -12,7 +12,7 @@ class Preprocessor:
     """
     def __init__(self, nlp, parameters, linebreak, input_file_paths, verbose):
         """
-        Initializes the Preprocessor.
+        Initializes the Preprocessor. 
 
         :param nlp: An instance of a spaCy Language model used for processing text.
         :param parameters: A dictionary containing various settings and parameters for preprocessing.
