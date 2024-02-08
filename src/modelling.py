@@ -183,11 +183,11 @@ class ConstraintSearcher:
         highlighted_text += text[last_index:]
         print(highlighted_text)
 
-    def search_matches(self, text, id):
+    def search_constraint_items(self, text, id):
         """
-        Searches for matches in the text based on defined patterns, considering exceptions.
+        Searches for constraint items in the text based on defined patterns, considering exceptions.
 
-        :param text: The text in which to search for matches.
+        :param text: The text in which to search for constraint items.
         :param id: The ID of the first match found by the current function within the document.
         :return id: The ID of the last match + 1 found by the current function within the document.
         """
@@ -219,8 +219,7 @@ class ConstraintSearcher:
 
                 # Determining if the match is an exception
                 # Check in formatted exception patterns and the keys of exceptions_dict after formatting them
-                is_exception = formatted_match_str in formatted_exception_patterns or \
-                            formatted_match_str in {key.upper().replace(" ", "_") for key in exceptions_dict.keys()}
+                is_exception = formatted_match_str in formatted_exception_patterns or formatted_match_str in {key.upper().replace(" ", "_") for key in exceptions_dict.keys()}
 
                 # Handling symbols
                 phrase = match_str.replace("_", " ").lower()
@@ -325,9 +324,9 @@ class MetaConstraintSearcher(ConstraintSearcher):
         super().__init__(nlp, parameters)
         self.type = 'META'
 
-    def search_enum_constraints(self, text, enumeration_summary, id):
+    def search_enum_constraint_items(self, text, enumeration_summary, id):
         """
-        Searches and processes meta constraints based on enumeration summaries.
+        Searches and processes enumeration constraint items based on enumeration summaries.
 
         :param text: The text in which to search for matches.
         :param enumeration_summary: A tuple containing enumeration details from the dataframe.
@@ -1279,15 +1278,15 @@ class ConstraintBuilder:
 
         return streamlined
 
-def get_constraints(nlp, builder, text, equality_params, inequality_params, meta_params, enumeration_summary, linebreaks, id=1, verbose=True):
+def get_constraint(nlp, builder, text, equality_params, inequality_params, meta_params, enumeration_summary, linebreaks, id=1, verbose=True):
     """
-    Conducts a combined search for equality, inequality, and meta (enumeration) constraints within a given text and formats the constraints according to the builder.
+    Conducts a combined search for equality, inequality, and meta (enumeration) constraint items within a given text and formats the constraint according to the builder.
 
-    This function initializes InequalityConstraintSearcher, EqualityConstraintSearcher, and MetaConstraintSearcher, performs the search, and then combines their findings. It also calls the method to format the constraints.
+    This function initializes InequalityConstraintSearcher, EqualityConstraintSearcher, and MetaConstraintSearcher, performs the search, and then combines their findings. It also calls the method to format the constraint.
 
     :param nlp: A spaCy Language model instance used for text processing.
-    :param builder: A ConstraintBuilder instance to format the constraints.
-    :param text: The text to search within for constraints.
+    :param builder: A ConstraintBuilder instance to format the constraint.
+    :param text: The text to search within for constraint items.
     :param equality_params: Parameters for the EqualityConstraintSearcher.
     :param inequality_params: Parameters for the InequalityConstraintSearcher.
     :param meta_params: Parameters for the MetaConstraintSearcher.
@@ -1295,7 +1294,7 @@ def get_constraints(nlp, builder, text, equality_params, inequality_params, meta
     :param linebreaks: Information on succeding line breaks for meta constraint searching.
     :param id: The ID of the first match found by the current function within the document.
     :param verbose: Parameter to control the printed output. If True, output is printed.
-    :return constraints: A dictionary with detailed information about the found constraints. 
+    :return constraint: A dictionary with detailed information about the found constraint. 
     :return id: The ID of the last match + 1 found by the current function within the document.
     """
     first_id = id
@@ -1306,50 +1305,50 @@ def get_constraints(nlp, builder, text, equality_params, inequality_params, meta
     meta = MetaConstraintSearcher(nlp, meta_params)
     
     # Perform the searches and combine match details
-    id = inequality.search_matches(text, id)
-    id = equality.search_matches(text, id)
-    id = meta.search_enum_constraints(text, enumeration_summary, id)
+    id = inequality.search_constraint_items(text, id)
+    id = equality.search_constraint_items(text, id)
+    id = meta.search_enum_constraint_items(text, enumeration_summary, id)
     id = meta.search_if_clauses(text, linebreaks, id)
     id = meta.search_for_clauses(text, linebreaks, id)
 
     # Concatenate findings in output dict
-    constraints = {}
+    constraint = {}
     for key in inequality.constraints.keys():
-        constraints[key] = inequality.constraints[key] + equality.constraints[key] + meta.constraints[key]
+        constraint[key] = inequality.constraints[key] + equality.constraints[key] + meta.constraints[key]
 
     # If constraints where found, first determine context, then insert 'BOOL' constraints, then rank and connect the constraints
-    if len(constraints['id']):
-        constraints = meta.determine_context(text, constraints, linebreaks)
-        constraints = meta.insert_connections(text, constraints)
-        constraints = meta.insert_bool(constraints)
-        constraints = meta.sort_and_prune(constraints)
+    if len(constraint['id']):
+        constraint = meta.determine_context(text, constraint, linebreaks)
+        constraint = meta.insert_connections(text, constraint)
+        constraint = meta.insert_bool(constraint)
+        constraint = meta.sort_and_prune(constraint)
 
-        if len(constraints['id']):
-            id = constraints['id'][-1] + 1
+        if len(constraint['id']):
+            id = constraint['id'][-1] + 1
             # Build constraint
-            formatted_constraint = builder.build_constraint(text, constraints)
+            formatted_constraint = builder.build_constraint(text, constraint)
         else: # If all constraints removed, reset id
             id = first_id
 
     if verbose:
         # Unpack negations for visualisation
-        combined_negations = [neg[0] for neg in constraints['negation'] if isinstance(neg, tuple)]
+        combined_negations = [neg[0] for neg in constraint['negation'] if isinstance(neg, tuple)]
         # Highlight text
-        ConstraintSearcher(nlp, equality_params).highlight_matches(text, linebreaks, constraints['match'], combined_negations, constraints['type'], constraints['pattern'])
+        ConstraintSearcher(nlp, equality_params).highlight_matches(text, linebreaks, constraint['match'], combined_negations, constraint['type'], constraint['pattern'])
 
         # Print in tabular format
-        combined_table_data = zip(*constraints.values()) 
+        combined_table_data = zip(*constraint.values()) 
         # Only print if any of the lists in constraints has elements
-        if any(constraints.values()): 
+        if any(constraint.values()): 
             print()
-            print(tabulate(combined_table_data, headers=constraints.keys()))
+            print(tabulate(combined_table_data, headers=constraint.keys()))
             print()
             for c in formatted_constraint:
                 print(c)
 
-    constraints['formatted'] = formatted_constraint
+    constraint['formatted'] = formatted_constraint
 
-    return constraints, id
+    return constraint, id
 
 def get_constraints_from_data(nlp, data, equality_params, inequality_params, meta_params, builder_params, verbose=True):
     """
@@ -1391,7 +1390,7 @@ def get_constraints_from_data(nlp, data, equality_params, inequality_params, met
                     print("++++ CHUNK ++++", "\n")
 
                 # Search for constraints
-                new_constraints, id = get_constraints(nlp, builder, chunk, equality_params, inequality_params, meta_params, row['Enumeration'][chunk_index], row['Linebreak'][chunk_index], id, verbose)
+                new_constraints, id = get_constraint(nlp, builder, chunk, equality_params, inequality_params, meta_params, row['Enumeration'][chunk_index], row['Linebreak'][chunk_index], id, verbose)
 
                 for key, values in new_constraints.items():
                     constraints_tmp[use_case][key].extend(values)
